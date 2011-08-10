@@ -14,6 +14,10 @@ export IP_REPO=$REPOS_ROOT/.inprogress.$REPOSITORY
 export OLD_REPO=$REPOS_ROOT/.old.$REPOSITORY
 export LAST_REPO=$REPOS_ROOT/.last.$REPOSITORY
 
+if [[ ! -d "$REPOS_ROOT" ]]; then
+    die "Repository root directory $REPOS_ROOT doesn't exist!!!"
+fi
+
 # Not actually a real lock, just pretends to be one.
 export LOCK=/tmp/mash_workdir2/$REPOSITORY.inprogress
 if [[ -e $LOCK ]];
@@ -40,15 +44,20 @@ if [[ $result == 0 ]]; then
         die "Mash succeeded but updated repo not found at $IP_REPO/$REPOSITORY"
     fi
     if [[ -e "$LIVE_REPO" ]]; then
+        echo "Saving live repository $LIVE_REPO"
         mv "$LIVE_REPO" "$OLD_REPO" || die "Unable to save live repository $LIVE_REPO"
     fi
+    echo "Making in-progress repository $IP_REPO/$REPOSITORY live"
     mv "$IP_REPO/$REPOSITORY" "$LIVE_REPO" || die "Unable to make in-progress repository at $IP_REPO/$REPOSITORY live"
     if [[ -e "$LAST_REPO" ]]; then
+        echo "Removing previous repo $LAST_REPO"
         rm -rf "$LAST_REPO"
     fi
     if [[ -e "$OLD_REPO" ]]; then
-        mv "$OLD_REPO" "$LAST_REPO" || die "Unable to preserve old repo"
+        echo "Preserving old repo $OLD_REPO at $LAST_REPO"       
+        mv "$OLD_REPO" "$LAST_REPO" || die "Unable to preserve old repo $OLD_REPO at $LAST_REPO"
     fi
+    echo "Removing in-progress repo $IP_REPO"
     rm -rf "$IP_REPO"
 else
     die "Mash returned $result"
