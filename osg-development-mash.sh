@@ -34,7 +34,7 @@ export PYTHONPATH=/p/vdt/workspace/mash/koji-1.4.0:$MASH_LOCATION/mash
 if [[ -e $IP_REPO ]]; then
     rm -rf $IP_REPO
 fi
-/usr/bin/python $MASH_LOCATION/mash.py $REPOSITORY -c /p/vdt/workspace/mash/etc/mash_osg.conf -o $IP_REPO
+/usr/bin/python $MASH_LOCATION/mash.py $REPOSITORY -c /p/vdt/workspace/mash/etc/mash_osg.conf -o $IP_REPO | grep -v 'not signed'
 
 result=$?
 
