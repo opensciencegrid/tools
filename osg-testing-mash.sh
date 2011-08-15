@@ -1,3 +1,3 @@
 #!/bin/bash
-./osg-repo-mash.sh testing
+/p/vdt/workspace/mash/tools/osg-repo-mash.sh testing
 
