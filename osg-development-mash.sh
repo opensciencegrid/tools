@@ -13,6 +13,9 @@ export LIVE_REPO=$REPOS_ROOT/3.0/el5/$REPOSITORY
 export IP_REPO=$REPOS_ROOT/.inprogress.$REPOSITORY
 export OLD_REPO=$REPOS_ROOT/.old.$REPOSITORY
 export LAST_REPO=$REPOS_ROOT/.last.$REPOSITORY
+export MASH_CONFIG=/p/vdt/workspace/mash/etc/mash_osg.conf
+# Synchronize this with the config file
+export MASH_CACHE=/scratch.1/vdt-osg-mash/cache
 
 if [[ ! -d "$REPOS_ROOT" ]]; then
     die "Repository root directory $REPOS_ROOT doesn't exist!!!"
@@ -34,7 +37,7 @@ export PYTHONPATH=/p/vdt/workspace/mash/koji-1.4.0:$MASH_LOCATION/mash
 if [[ -e $IP_REPO ]]; then
     rm -rf $IP_REPO
 fi
-/usr/bin/python $MASH_LOCATION/mash.py $REPOSITORY -c /p/vdt/workspace/mash/etc/mash_osg.conf -o $IP_REPO | grep -v 'not signed'
+/usr/bin/python $MASH_LOCATION/mash.py $REPOSITORY -c $MASH_CONFIG -o $IP_REPO | grep -v 'not signed'
 
 result=$?
 
@@ -62,6 +65,9 @@ if [[ $result == 0 ]]; then
 #    fi
     echo "Removing in-progress repo $IP_REPO"
     rm -rf "$IP_REPO"
+
+    echo "Removing cache $MASH_CACHE"
+    rm -rf "$MASH_CACHE"
 else
     die "Mash returned $result"
 fi
