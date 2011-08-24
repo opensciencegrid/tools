@@ -135,6 +135,9 @@ def do_update():
         env=mash_environ)
     mash_outerr = mash_proc.communicate()[0]
     mash_ret = mash_proc.returncode
+    mash_outerr = re.sub(
+        r"""(?xms) ^ [^\n]* WARNING: \s* package [^\n]+ not [ ] signed [^\n]+ $""",
+        "", mash_outerr)
 
     if mash_ret or re.search("mash failed", mash_outerr):
         logging.error(mash_outerr)
