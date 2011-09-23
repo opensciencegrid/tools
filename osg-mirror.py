@@ -103,7 +103,7 @@ def do_mirror(goc_repo, live_repo, ip_repo, old_repo):
         shutil.rmtree(ip_repo)
 
     rsync_proc = subprocess.Popen(
-        ["/usr/bin/rsync", "-avrt", goc_repo, "--exclude=debug/", ip_repo],
+        ["/usr/bin/rsync", "-art", goc_repo, "--exclude=debug/", ip_repo],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     rsync_outerr = rsync_proc.communicate()[0]
