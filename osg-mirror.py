@@ -136,7 +136,7 @@ def do_mirror(goc_repo, live_repo, ip_repo, old_repo):
 #
 
 logging.basicConfig(format="%(levelname)s:" + os.path.basename(sys.argv[0]) + ":%(message)s",
-                    level=logging.DEBUG)
+                    level=logging.WARNING)
 
 if len(sys.argv) < 2:
     print >>sys.stderr, ("Usage: %s REPO..." % sys.argv[0])
