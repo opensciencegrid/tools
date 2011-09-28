@@ -15,7 +15,9 @@ from time import clock, ctime, sleep, time
 REPOS_ROOT = "/p/vdt/public/html/repos/3.0/el5"
 #REPOS_ROOT = "/scratch/matyas/repos/3.0/el5"
 GOC_ROOT = "rsync://repo.grid.iu.edu"
-LOCK_RETRY_MAX = 60 * 30
+LOCK_RETRY_MAX = 60 * 20
+
+DEBUG = False
 
 # REPO_MAP: [rsync from, rsync to] pairs
 REPO_MAP = {
@@ -102,15 +104,22 @@ def do_mirror(goc_repo, live_repo, ip_repo, old_repo):
     if os.path.exists(ip_repo):
         shutil.rmtree(ip_repo)
 
+    rsync_cmd = ["/usr/bin/rsync", "-art", goc_repo, "--exclude=debug/", ip_repo]
+    if os.path.exists(live_repo):
+        logging.debug("Live repo exists. Passing --copy-dest=%s to rsync", live_repo)
+        rsync_cmd += ["--copy-dest=" + live_repo]
+    if DEBUG:
+        rsync_cmd += ["-v"]
+
     rsync_proc = subprocess.Popen(
-        ["/usr/bin/rsync", "-art", goc_repo, "--exclude=debug/", ip_repo],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     rsync_outerr = rsync_proc.communicate()[0]
     rsync_ret = rsync_proc.returncode
 
     if rsync_ret:
         logging.error(rsync_outerr)
+        logging.error("Died with code %d", rsync_ret)
         raise Exception("Rsync had problems!")
     else:
         logging.debug("Rsync succeeded, output:\n%s", rsync_outerr)
@@ -135,8 +144,13 @@ def do_mirror(goc_repo, live_repo, ip_repo, old_repo):
 # SCRIPT BEGINS HERE
 #
 
+if DEBUG:
+    level = logging.DEBUG
+else:
+    level = logging.WARNING
+
 logging.basicConfig(format="%(levelname)s:" + os.path.basename(sys.argv[0]) + ":%(message)s",
-                    level=logging.WARNING)
+                    level=level)
 
 if len(sys.argv) < 2:
     print >>sys.stderr, ("Usage: %s REPO..." % sys.argv[0])
