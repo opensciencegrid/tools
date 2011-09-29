@@ -5,6 +5,7 @@ import os
 from os.path import join as opj
 from socket import getfqdn
 import shutil
+import signal
 import subprocess
 import sys
 import time as time_
@@ -16,6 +17,7 @@ REPOS_ROOT = "/p/vdt/public/html/repos/3.0/el5"
 #REPOS_ROOT = "/scratch/matyas/repos/3.0/el5"
 GOC_ROOT = "rsync://repo.grid.iu.edu"
 LOCK_RETRY_MAX = 60 * 20
+GLOBAL_TIMEOUT = 60 * 50
 
 DEBUG = False
 
@@ -26,6 +28,14 @@ REPO_MAP = {
     'production': [opj(GOC_ROOT, "osg-release"), opj(REPOS_ROOT, "production")],
     'contrib': [opj(GOC_ROOT, "osg-contrib"), opj(REPOS_ROOT, "contrib")],
 }
+
+class Alarm(Exception): pass
+class RsyncFailure(Exception): pass
+
+def alarm_handler(signum, frame):
+    if signum == signal.SIGALRM:
+        raise Alarm()
+    
 
 def safe_makedirs(directory, mode=0777):
     """A wrapper around os.makedirs that does not raise an exception if the
@@ -111,11 +121,15 @@ def do_mirror(goc_repo, live_repo, ip_repo, old_repo):
     if DEBUG:
         rsync_cmd += ["-v"]
 
-    rsync_proc = subprocess.Popen(
-        rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    try:
+        rsync_proc = subprocess.Popen(
+            rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-    rsync_outerr = rsync_proc.communicate()[0]
-    rsync_ret = rsync_proc.returncode
+        rsync_outerr = rsync_proc.communicate()[0]
+        rsync_ret = rsync_proc.returncode
+    except Alarm:
+        rsync_proc.terminate()
+        raise
 
     if rsync_ret:
         logging.error(rsync_outerr)
@@ -165,6 +179,10 @@ for a in sys.argv[1:]:
                              "repositories are: %s" % (a, ",".join(REPO_MAP.keys())))
         sys.exit(2)
 
+logging.debug("Setting alarm for %d minutes", (GLOBAL_TIMEOUT / 60))
+signal.signal(signal.SIGALRM, alarm_handler)
+signal.alarm(GLOBAL_TIMEOUT)
+
 for repository in sys.argv[1:]:
     goc_repo = REPO_MAP[repository][0]
     live_repo = REPO_MAP[repository][1]
@@ -182,14 +200,22 @@ for repository in sys.argv[1:]:
 
     obtain_lock(lock_file)
     try:
-        start_time = time()
-        logging.debug("Started at " + ctime())
-        do_mirror(goc_repo, live_repo, ip_repo, old_repo)
-        end_time = time()
-        logging.debug("Finished at " + ctime())
-        elapsed_time = end_time - start_time
-        logging.debug("Elapsed time: %f seconds", elapsed_time)
-    finally:
-        release_lock(lock_file)
+        try:
+            start_time = time()
+            logging.debug("Started at " + ctime())
+            do_mirror(goc_repo, live_repo, ip_repo, old_repo)
+            end_time = time()
+            logging.debug("Finished at " + ctime())
+            elapsed_time = end_time - start_time
+            logging.debug("Elapsed time: %f seconds", elapsed_time)
+        finally:
+            release_lock(lock_file)
+    except Alarm:
+        logging.critical("Global timeout exceeded")
+        sys.exit(14)
+    except RsyncFailure:
+        # in case of rsync failure, try the next repository instead of aborting
+        # everything
+        continue
 
 
