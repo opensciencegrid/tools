@@ -128,13 +128,15 @@ def do_mirror(goc_repo, live_repo, ip_repo, old_repo):
         rsync_outerr = rsync_proc.communicate()[0]
         rsync_ret = rsync_proc.returncode
     except Alarm:
+        logging.critical("Global timeout exceeded")
+        logging.error("Rsync output follows:\n%s", rsync_outerr)
         rsync_proc.terminate()
         raise
 
     if rsync_ret:
         logging.error(rsync_outerr)
         logging.error("Died with code %d", rsync_ret)
-        raise Exception("Rsync had problems!")
+        raise RsyncFailure("Rsync had problems!")
     else:
         logging.debug("Rsync succeeded, output:\n%s", rsync_outerr)
 
@@ -211,7 +213,6 @@ for repository in sys.argv[1:]:
         finally:
             release_lock(lock_file)
     except Alarm:
-        logging.critical("Global timeout exceeded")
         sys.exit(14)
     except RsyncFailure:
         # in case of rsync failure, try the next repository instead of aborting
