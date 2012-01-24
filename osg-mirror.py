@@ -8,7 +8,6 @@ import shutil
 import signal
 import subprocess
 import sys
-import time as time_
 from time import clock, ctime, sleep, time
 
 
@@ -17,7 +16,7 @@ REPOS_ROOT = "/p/vdt/public/html/repos/3.0/el5"
 #REPOS_ROOT = "/scratch/matyas/repos/3.0/el5"
 GOC_ROOT = "rsync://repo.grid.iu.edu"
 LOCK_RETRY_MAX = 60 * 20
-GLOBAL_TIMEOUT = 60 * 50
+GLOBAL_TIMEOUT = 60 * 59
 
 DEBUG = False
 
@@ -54,8 +53,8 @@ def obtain_lock(lock_file):
     retry = 60
     while retry < LOCK_RETRY_MAX and os.path.exists(lock_file):
         #   If on local machine, see if that pid still exists. If not, continue.
+        fh = open(lock_file, 'r')
         try:
-            fh = open(lock_file, 'r')
             line = fh.readline().strip()
             try:
                 their_user, their_fqdn, their_pid = line.split(":")
@@ -82,7 +81,8 @@ def obtain_lock(lock_file):
                 retry *= 2
                 continue
         finally:
-            fh.close()
+            if fh:
+                fh.close()
     if retry >= LOCK_RETRY_MAX:
         if not their_user or not their_fqdn or not their_pid:
             raise Exception("Lockfile " + lock_file + " exists but its contents"
@@ -92,15 +92,17 @@ def obtain_lock(lock_file):
                             "Lock created by " + their_user + " on " +
                             their_fqdn + " with pid " + str(their_pid))
     #   Create our lockfile.
+    safe_makedirs(os.path.dirname(lock_file))
+    fh = open(lock_file, 'w')
     try:
-        fh = open(lock_file, 'w')
         lock_contents = ":".join([pwd.getpwuid(os.getuid())[0],
                                   getfqdn(),
                                   str(os.getpid())])
         logging.debug("Lock contents: %s", lock_contents)
-        print >>fh, lock_contents
+        print >> fh, lock_contents
     finally:
-        fh.close()
+        if fh:
+            fh.close()
 
 
 def release_lock(lock_file):
@@ -114,31 +116,37 @@ def do_mirror(goc_repo, live_repo, ip_repo, old_repo):
     if os.path.exists(ip_repo):
         shutil.rmtree(ip_repo)
 
-    rsync_cmd = ["/usr/bin/rsync", "-art", goc_repo, "--exclude=debug/", ip_repo]
+    rsync_cmd = ["/usr/bin/rsync", "-arvt", goc_repo, "--exclude=debug/", ip_repo]
     if os.path.exists(live_repo):
         logging.debug("Live repo exists. Passing --copy-dest=%s to rsync", live_repo)
         rsync_cmd += ["--copy-dest=" + live_repo]
-    if DEBUG:
-        rsync_cmd += ["-v"]
+    #if DEBUG:
+        #rsync_cmd += ["-v"]
 
+    rsync_outerr = ""
     try:
         rsync_proc = subprocess.Popen(
             rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-        rsync_outerr = rsync_proc.communicate()[0]
+        # communicate() returns nothing if we kill the process via a signal,
+        # but we still want the output, so we're not using it.
+        while rsync_proc.poll() is None:
+            rsync_outerr += rsync_proc.stdout.readline()
         rsync_ret = rsync_proc.returncode
     except Alarm:
         logging.critical("Global timeout exceeded")
-        logging.error("Rsync output follows:\n%s", rsync_outerr)
-        rsync_proc.terminate()
+        logging.critical("Last rsync command: " + str(rsync_cmd))
+        logging.critical("rsync output follows:\n%s", rsync_outerr)
+        rsync_proc.send_signal(signal.SIGALRM)
         raise
 
     if rsync_ret:
+        logging.error("Last rsync command: " + str(rsync_cmd))
         logging.error(rsync_outerr)
         logging.error("Died with code %d", rsync_ret)
-        raise RsyncFailure("Rsync had problems!")
+        raise RsyncFailure("rsync had problems!")
     else:
-        logging.debug("Rsync succeeded, output:\n%s", rsync_outerr)
+        logging.debug("rsync succeeded, output:\n%s", rsync_outerr)
 
     if os.path.exists(live_repo):
         logging.debug("Saving live repository %s to %s", live_repo, old_repo)
@@ -169,16 +177,16 @@ logging.basicConfig(format="%(levelname)s:" + os.path.basename(sys.argv[0]) + ":
                     level=level)
 
 if len(sys.argv) < 2:
-    print >>sys.stderr, ("Usage: %s REPO..." % sys.argv[0])
-    print >>sys.stderr, ("Valid repositories are: " +
-                         ",".join(REPO_MAP.keys()))
+    print >> sys.stderr, ("Usage: %s REPO..." % sys.argv[0])
+    print >> sys.stderr, ("Valid repositories are: " +
+                          ",".join(REPO_MAP.keys()))
     sys.exit(2)
 
 # validate arguments
 for a in sys.argv[1:]:
-    if a not in REPO_MAP.keys():
-        print >>sys.stderr, ("%s is not a valid repository name. Valid "
-                             "repositories are: %s" % (a, ",".join(REPO_MAP.keys())))
+    if a not in REPO_MAP:
+        print >> sys.stderr, ("%s is not a valid repository name. Valid "
+                              "repositories are: %s" % (a, ",".join(REPO_MAP.keys())))
         sys.exit(2)
 
 logging.debug("Setting alarm for %d minutes", (GLOBAL_TIMEOUT / 60))
