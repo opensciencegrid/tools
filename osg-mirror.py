@@ -16,7 +16,7 @@ REPOS_ROOT = "/p/vdt/public/html/repos/3.0/el5"
 #REPOS_ROOT = "/scratch/matyas/repos/3.0/el5"
 GOC_ROOT = "rsync://repo.grid.iu.edu"
 LOCK_RETRY_MAX = 60 * 20
-GLOBAL_TIMEOUT = 60 * 59
+GLOBAL_TIMEOUT = 60 * 119 # 2 hours
 
 DEBUG = False
 
