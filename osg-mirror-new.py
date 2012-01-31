@@ -15,7 +15,7 @@ from time import clock, ctime, sleep, time
 #REPOS_ROOT = "/p/vdt/public/html/repos"
 REPOS_ROOT = "/scratch/matyas/repos"
 GOC_ROOT = "rsync://repo.grid.iu.edu"
-ITB_ROOT = "rsync://repo-itb.grid.iu.edu"
+ITB_ROOT = "rsync://repo-itb.grid.iu.edu/osg"
 LOCK_RETRY_MAX = 60 * 20
 GLOBAL_TIMEOUT = 60 * 119 # 2 hours
 
@@ -25,8 +25,8 @@ REPO_MAP = {}
 vdtver = "3.0"
 for distro in ['el5', 'el6']:
     for level in ['development', 'contrib', 'testing', 'release']:
-        key = "%(vdtver)s-%(distro)s-osg-%(level)s" % locals()
-        from_loc = opj(ITB_ROOT, key)
+        key = "%(vdtver)s-%(distro)s-%(level)s" % locals()
+        from_loc = opj(ITB_ROOT, vdtver, distro, "osg-%s/" % level)
         if level == 'release':
             locallevel = 'production'
         else:
@@ -204,7 +204,8 @@ signal.alarm(GLOBAL_TIMEOUT)
 
 for repository in repos_to_sync:
     goc_repo, live_repo = REPO_MAP[repository]
-    logging.debug("*** Updating repository %s via rsync from %s to %s ***\n\n" %
+    logging.debug("*** Updating repository %s via rsync ***"
+                  "\nfrom: %s\nto  : %s\n\n" %
                   (repository, goc_repo, live_repo))
     repo_parent = os.path.dirname(live_repo)
     repo_bn = os.path.basename(live_repo)
