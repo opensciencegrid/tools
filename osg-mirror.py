@@ -12,21 +12,31 @@ from time import clock, ctime, sleep, time
 
 
 
-REPOS_ROOT = "/p/vdt/public/html/repos/3.0/el5"
-#REPOS_ROOT = "/scratch/matyas/repos/3.0/el5"
-GOC_ROOT = "rsync://repo.grid.iu.edu"
+REPOS_ROOT = "/p/vdt/public/html/repos"
+#REPOS_ROOT = "/scratch/matyas/repos"
+GOC_ROOT = "rsync://repo.grid.iu.edu/osg"
+#GOC_ROOT = "rsync://repo-itb.grid.iu.edu/osg"
 LOCK_RETRY_MAX = 60 * 20
 GLOBAL_TIMEOUT = 60 * 119 # 2 hours
 
 DEBUG = False
 
-# REPO_MAP: [rsync from, rsync to] pairs
-REPO_MAP = {
-    'development': [opj(GOC_ROOT, "osg-development"), opj(REPOS_ROOT, "development")],
-    'testing': [opj(GOC_ROOT, "osg-testing"), opj(REPOS_ROOT, "testing")],
-    'production': [opj(GOC_ROOT, "osg-release"), opj(REPOS_ROOT, "production")],
-    'contrib': [opj(GOC_ROOT, "osg-contrib"), opj(REPOS_ROOT, "contrib")],
-}
+REPO_MAP = {}
+SYMLINK_MAP = {}
+vdtver = "3.0"
+for distro in ['el5', 'el6']:
+    for level in ['development', 'contrib', 'testing', 'release']:
+        key = "%(vdtver)s-%(distro)s-%(level)s" % locals()
+        from_loc = opj(GOC_ROOT, vdtver, distro, "osg-%s/" % level)
+        # For historical reasons, the dir for our release repos is
+        # called 'production'
+        if level == 'release':
+            locallevel = 'production'
+        else:
+            locallevel = level
+        to_loc = opj(REPOS_ROOT, vdtver, distro, locallevel)
+        REPO_MAP[key] = [from_loc, to_loc]
+        SYMLINK_MAP[key] = [os.path.basename(to_loc), opj(REPOS_ROOT, vdtver, distro, "osg-%s" % level)]
 
 class Alarm(Exception): pass
 class RsyncFailure(Exception): pass
@@ -120,8 +130,6 @@ def do_mirror(goc_repo, live_repo, ip_repo, old_repo):
     if os.path.exists(live_repo):
         logging.debug("Live repo exists. Passing --copy-dest=%s to rsync", live_repo)
         rsync_cmd += ["--copy-dest=" + live_repo]
-    #if DEBUG:
-        #rsync_cmd += ["-v"]
 
     rsync_outerr = ""
     try:
@@ -161,6 +169,16 @@ def do_mirror(goc_repo, live_repo, ip_repo, old_repo):
 
     
 
+def make_symlink(repo):
+    # For historical reasons, our paths are different than the GOC's.
+    # Make symlinks so that their paths work as well.
+    symlink = SYMLINK_MAP[repo]
+    if not os.path.exists(symlink[1]):
+        logging.debug("Making symlink: %s -> %s" % (symlink[1], symlink[0]))
+        os.symlink(symlink[0], symlink[1])
+    else:
+        logging.debug("Not making symlink: %s already exists" % symlink[1])
+
     
     
 
@@ -178,25 +196,30 @@ logging.basicConfig(format="%(levelname)s:" + os.path.basename(sys.argv[0]) + ":
 
 if len(sys.argv) < 2:
     print >> sys.stderr, ("Usage: %s REPO..." % sys.argv[0])
-    print >> sys.stderr, ("Valid repositories are: " +
+    print >> sys.stderr, ("Valid repositories are: ALL," +
                           ",".join(REPO_MAP.keys()))
     sys.exit(2)
 
 # validate arguments
-for a in sys.argv[1:]:
-    if a not in REPO_MAP:
-        print >> sys.stderr, ("%s is not a valid repository name. Valid "
-                              "repositories are: %s" % (a, ",".join(REPO_MAP.keys())))
-        sys.exit(2)
+if 'ALL' not in sys.argv:
+    for a in sys.argv[1:]:
+        if a not in REPO_MAP:
+            print >> sys.stderr, ("%s is not a valid repository name. Valid "
+                                  "repositories are: ALL,%s" %
+                                  (a, ",".join(REPO_MAP.keys())))
+            sys.exit(2)
+    repos_to_sync = sys.argv[1:]
+else:
+    repos_to_sync = REPO_MAP.keys()
 
 logging.debug("Setting alarm for %d minutes", (GLOBAL_TIMEOUT / 60))
 signal.signal(signal.SIGALRM, alarm_handler)
 signal.alarm(GLOBAL_TIMEOUT)
 
-for repository in sys.argv[1:]:
-    goc_repo = REPO_MAP[repository][0]
-    live_repo = REPO_MAP[repository][1]
-    logging.debug("*** Updating repository %s via rsync from %s to %s ***\n\n" %
+for repository in repos_to_sync:
+    goc_repo, live_repo = REPO_MAP[repository]
+    logging.debug("*** Updating repository %s via rsync ***"
+                  "\nfrom: %s\nto  : %s\n\n" %
                   (repository, goc_repo, live_repo))
     repo_parent = os.path.dirname(live_repo)
     repo_bn = os.path.basename(live_repo)
@@ -214,6 +237,7 @@ for repository in sys.argv[1:]:
             start_time = time()
             logging.debug("Started at " + ctime())
             do_mirror(goc_repo, live_repo, ip_repo, old_repo)
+            make_symlink(repository)
             end_time = time()
             logging.debug("Finished at " + ctime())
             elapsed_time = end_time - start_time
