@@ -7,82 +7,82 @@ import subprocess
 # email script by Nick Pasternack to help VDT (4/20/12)
 
 def parseArgs():
-	"""Parses arguments, use -h for details"""
-	usage = "usage: %prog [options] argument"
-	parser = OptionParser(usage=usage)
+    """Parses arguments, use -h for details"""
+    usage = "usage: %prog [options] argument"
+    parser = OptionParser(usage=usage)
 
-	parser.add_option("-u","--url", metavar="url", action="store", type="string", \
-						dest="url", help="url to download")
-	parser.add_option("-e", "--email", metavar="To", action="store", type="string", \
-					dest="To", help="email address to send to")
-	parser.add_option( "-d", "--debug", \
-					  action="store_false", metavar="ShouldEM", dest="ShouldEM", default=True, \
-					  help="don't send email")
+    parser.add_option("-u","--url", metavar="url", action="store", type="string", \
+                        dest="url", help="url to download")
+    parser.add_option("-e", "--email", metavar="To", action="store", type="string", \
+                    dest="To", help="email address to send to")
+    parser.add_option( "-d", "--debug", \
+                      action="store_false", metavar="ShouldEM", dest="ShouldEM", default=True, \
+                      help="don't send email")
 
-	(options, args) = parser.parse_args()
+    (options, args) = parser.parse_args()
 
-	url = options.url
-	To = options.To 
-	ShouldEM = options.ShouldEM 
-	list_of_parsed_args = [url,To,ShouldEM,args]
-	return (url,To,ShouldEM,args)
+    url = options.url
+    To = options.To 
+    ShouldEM = options.ShouldEM 
+    list_of_parsed_args = [url,To,ShouldEM,args]
+    return (url,To,ShouldEM,args)
 
 def dispError(url,To,ShouldEM,args):
-	doDispError = False
-	if To == None and ShouldEM == True:
-		doDispError = True
-	if url == None or doDispError == True:
-		parser.error("url is required and To is required if not in debug mode\n")
-		
-	if url == None and doDispError == True:
-		parser.error("url is required and To is required if not in debug mode\n")
-	if len(args) != 0:
-		parser.error("incorrect number of arguments")
-	else:
-		return
+    doDispError = False
+    if To == None and ShouldEM == True:
+        doDispError = True
+    if url == None or doDispError == True:
+        parser.error("url is required and To is required if not in debug mode\n")
+        
+    if url == None and doDispError == True:
+        parser.error("url is required and To is required if not in debug mode\n")
+    if len(args) != 0:
+        parser.error("incorrect number of arguments")
+    else:
+        return
 
 
 def getTriageDuty(url):
-	"""Finds out who is on Triage Duty"""
-	mwords = []
-	C = iCalLib.Cal()
-	C.download(url)
-	# C.events()
-	C.events_today()
-	print "events today:\n"
-	for CE in C.eventsToday:
-		print CE.description
-		mwords.append(CE.description)
-	return mwords
+    """Finds out who is on Triage Duty"""
+    mwords = []
+    C = iCalLib.Cal()
+    C.download(url)
+    # C.events()
+    C.events_today()
+    print "events today:\n"
+    for CE in C.eventsToday:
+        print CE.description
+        mwords.append(CE.description)
+    return mwords
 
-def sendmessage(mwords,ShouldEM,To):	
-	"""Sends email with triage duty to recipient passed as parameter"""
-	_to = To
-	
-	mwords = ', '.join(mwords)
-	
-	emailFile = tempfile.NamedTemporaryFile()
+def sendmessage(mwords,ShouldEM,To):    
+    """Sends email with triage duty to recipient passed as parameter"""
+    _to = To
+    
+    mwords = ', '.join(mwords)
+    
+    emailFile = tempfile.NamedTemporaryFile()
 
-	if mwords == '':
-		mwords = "Triage Duty Unknown"
-	# this is text of email
-	
-	subject = 'This week\'s OSG Software Triage Duty:' +  mwords 
-	msg = subject + '\n More information at:'+ 'https://twiki.grid.iu.edu/bin/view/SoftwareTeam/TriageDuty\n'+ 'https://twiki.grid.iu.edu/bin/view/SoftwareTeam/SoftwareSupport\n\n'
-	
-	emailFile.write(msg)
-	
-	print "Subject: " + subject
-	print "Body: " + msg
-	if ShouldEM == True and mwords != '' and _to != None:
-		cmd = "/bin/mail"
-		args = "-s \"" + subject + "\" " + _to + "< " + emailFile.name
-		subprocess.call([cmd, args])
-	
-	emailFile.close
+    if mwords == '':
+        mwords = "Triage Duty Unknown"
+    # this is text of email
+    
+    subject = 'This week\'s OSG Software Triage Duty:' +  mwords 
+    msg = subject + '\n More information at:'+ 'https://twiki.grid.iu.edu/bin/view/SoftwareTeam/TriageDuty\n'+ 'https://twiki.grid.iu.edu/bin/view/SoftwareTeam/SoftwareSupport\n\n'
+    
+    emailFile.write(msg)
+    
+    print "Subject: " + subject
+    print "Body: " + msg
+    if ShouldEM == True and mwords != '' and _to != None:
+        cmd = "/bin/mail"
+        args = "-s \"" + subject + "\" " + _to + "< " + emailFile.name
+        subprocess.call([cmd, args])
+    
+    emailFile.close
 
 (url,To,ShouldEM,args) = parseArgs()
-dispError(url,To,ShouldEM,args)	
+dispError(url,To,ShouldEM,args) 
 mwords = getTriageDuty(url)
 sendmessage(mwords,ShouldEM,To)
 quit()
