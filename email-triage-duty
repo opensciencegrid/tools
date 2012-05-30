@@ -1,8 +1,43 @@
 #!/usr/bin/python
 import iCalLib
 from optparse import OptionParser
+import os
+import re
 import tempfile
 import subprocess
+import datetime
+
+import pwd
+import smtplib
+import socket
+# The email.* imports got renamed between Python versions so I have to deal with that.
+try:
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+except ImportError:
+    from email.MIMEText import MIMEText
+    from email.MIMEMultipart import MIMEMultipart
+
+def mailTextMessage(subject, text, recipients):
+    """Mail a plain text message to 'recipients'. 'recipients' is a list of
+    addresses to send email to. 'subject' and 'text' are strings containing
+    the subject line, and body text, resp."""
+    message = MIMEText(text)
+    # Create a 'From' address using data in the password file and the local
+    # machine's hostname.
+    pwdentry = pwd.getpwuid(os.getuid())
+    from_addr = "%s <%s@%s>" % (pwdentry.pw_gecos, # User's real name
+                                pwdentry.pw_name,  # User's login
+                                socket.getfqdn())  # Hostname
+    message['Subject'] = subject
+    message['From'] = from_addr
+    message['To'] = ', '.join(recipients)
+    smtp = smtplib.SMTP('localhost')
+    smtp.sendmail(from_addr,
+                  recipients,
+                  message.as_string())
+    smtp.quit()
+
 
 # email script by Nick Pasternack to help VDT (4/20/12)
 
@@ -24,66 +59,49 @@ def parseArgs():
     url = options.url
     To = options.To 
     ShouldEM = options.ShouldEM 
-    list_of_parsed_args = [url,To,ShouldEM,args]
-    return (url,To,ShouldEM,args)
 
-def dispError(url,To,ShouldEM,args):
-    doDispError = False
-    if To == None and ShouldEM == True:
-        doDispError = True
-    if url == None or doDispError == True:
-        parser.error("url is required and To is required if not in debug mode\n")
-        
-    if url == None and doDispError == True:
-        parser.error("url is required and To is required if not in debug mode\n")
+    if To is None and ShouldEM:
+        parser.error("To is required if not in debug mode\n")
+    if url is None:
+        parser.error("url is required\n")
     if len(args) != 0:
-        parser.error("incorrect number of arguments")
-    else:
-        return
+        parser.error("incorrect number of arguments\n")
+
+    return (url,To,ShouldEM)
 
 
-def getTriageDuty(url):
+def getTriageDuty(url, date):
     """Finds out who is on Triage Duty"""
-    mwords = []
+    on_triage = []
     C = iCalLib.Cal()
     C.download(url)
-    # C.events()
-    C.events_today()
-    print "events today:\n"
-    for CE in C.eventsToday:
-        print CE.description
-        mwords.append(CE.description)
-    return mwords
+    for CE in C.events_on_date(date):
+        triage_match = re.search(r'Triage:\s*(.*)', CE.summary)
+        if triage_match:
+            on_triage.append(triage_match.group(1))
+    return on_triage
 
-def sendmessage(mwords,ShouldEM,To):    
-    """Sends email with triage duty to recipient passed as parameter"""
-    _to = To
-    
-    mwords = ', '.join(mwords)
-    
-    emailFile = tempfile.NamedTemporaryFile()
+def buildMessage(url):
+    today = datetime.date.today()
+    triage_today = (', '.join(getTriageDuty(url, today)) or 'Triage Duty Unknown')
+    triage_next_week = (', '.join(getTriageDuty(url, today + datetime.timedelta(weeks=1))) or 'Triage Duty Unknown')
 
-    if mwords == '':
-        mwords = "Triage Duty Unknown"
-    # this is text of email
-    
-    subject = 'This week\'s OSG Software Triage Duty:' +  mwords 
-    msg = subject + '\n More information at:'+ 'https://twiki.grid.iu.edu/bin/view/SoftwareTeam/TriageDuty\n'+ 'https://twiki.grid.iu.edu/bin/view/SoftwareTeam/SoftwareSupport\n\n'
-    
-    emailFile.write(msg)
-    
-    print "Subject: " + subject
-    print "Body: " + msg
-    if ShouldEM == True and mwords != '' and _to != None:
-        cmd = "/bin/mail"
-        args = "-s \"" + subject + "\" " + _to + "< " + emailFile.name
-        subprocess.call([cmd, args])
-    
-    emailFile.close
+    subject = "This week's OSG Software Triage Duty: " + triage_today
+    body = """\
+OSG Triage Duty
+This week: %s
+Next week: %s
 
-(url,To,ShouldEM,args) = parseArgs()
-dispError(url,To,ShouldEM,args) 
-mwords = getTriageDuty(url)
-sendmessage(mwords,ShouldEM,To)
-quit()
+More information at:
+https://twiki.grid.iu.edu/bin/view/SoftwareTeam/TriageDuty
+https://twiki.grid.iu.edu/bin/view/SoftwareTeam/SoftwareSupport
+""" % (triage_today, triage_next_week)
+    
+    return (subject, body)
+    
+
+(url,To,ShouldEM) = parseArgs()
+subject, body = buildMessage(url)
+if ShouldEM:
+    mailTextMessage(subject, body, [To])
 
