@@ -1,0 +1,273 @@
+#!/usr/bin/env python
+"""
+binary-deplister
+
+A program for listing RPM dependencies of binary files under a directory tree.
+Original problem: determine which 32-bit RPMs need to be installed to be able
+to run the binaries from a 32-bit htcondor tarball on a 64-bit machine.
+
+See binary-deplister --help for options.
+
+This program walks through the directory tree, running ldd on each file;
+filters out .so files that are under the directory tree (with the idea that
+they are provided by the tarball we're examining) and then uses repoquery to
+resolve the .so files to RPMs.
+
+By default, this program prints a table listing each .so file that's a
+dependency, the RPM it can be found in, and the binaries it is needed for (so
+you can filter out features you're not interested in, for example). This
+program can also be told to skip resolving to RPMs, or to display just a list
+of RPMs instead of a table. Finally, one or more regexes can be specified on
+the command line; binaries matching one of those regexes will not be ldd'ed
+(this is another way of filtering out files you're not interested in).
+
+"""
+
+import glob
+import re
+import os
+import shutil
+import subprocess
+import sys
+
+from optparse import OptionParser
+
+
+def list_of_libs_from_ldd_output(ldd_output):
+    """Given the output from running ldd on a file, return two lists of libs:
+    first is a list of resolved libs -- libs with full paths. Second is a list
+    of unresolved libs -- just the basenames.
+
+    We match three kinds of output lines:
+
+    1. "linux-gate.so.1 =>  (0x00c8a000)" (unresolved library)
+       Add the filename on the left.
+    2. "libdl.so.2 => /lib/libdl.so.2 (0x004a7000)" (resolved library)
+       Add the filepath on the right.
+    3. "/lib/ld-linux.so.2 (0x002ec000)" (filepath)
+       Add the filepath.
+
+    In addition, if we get "not a dynamic executable", we return ([], [])
+    immediately.
+    """
+    unresolved_lib_pattern = re.compile(r'(?P<filename>\S+)\s+=>\s+(\(0x[0-9a-f]+\)|not found)')
+    resolved_lib_pattern = re.compile(r'(?P<filename>\S+)\s+=>\s+(?P<filepath>\S+)\s+\(0x[0-9a-f]+\)')
+    filepath_pattern = re.compile(r'(?P<filepath>\S+)\s+\(0x[0-9a-f]+\)')
+
+    resolved_libs = []
+    unresolved_libs = []
+
+    for line in ldd_output.split("\n"):
+        stripped_line = line.strip()
+        if not stripped_line:
+            continue
+        if "not a dynamic executable" in stripped_line:
+            return ([], [])
+
+        unresolved_lib_match = unresolved_lib_pattern.match(stripped_line)
+        resolved_lib_match = resolved_lib_pattern.match(stripped_line)
+        filepath_match = filepath_pattern.match(stripped_line)
+
+        if unresolved_lib_match:
+            unresolved_libs.append(unresolved_lib_match.group('filename'))
+        elif resolved_lib_match:
+            resolved_libs.append(resolved_lib_match.group('filepath'))
+        elif filepath_match:
+            resolved_libs.append(filepath_match.group('filepath'))
+        else:
+            print "Warning: no match for line %r" % stripped_line
+
+    return (resolved_libs, unresolved_libs)
+
+
+def is_subpath_of(path_a, path_b):
+    """Return True if path_a is a subpath of path_b"""
+    return os.path.realpath(path_a).startswith(os.path.realpath(path_b))
+
+
+def find_provided_libs(root_path):
+    """Return a list of all .so files under root_path"""
+    provided_libs = []
+    for dirpath, dirnames, filenames in os.walk(root_path):
+        provided_libs.extend([so_file for so_file in filenames if re.search(r'\.so(\.|$)', so_file)])
+    return provided_libs
+
+
+def find_required_libs(root_path, excludes=None):
+    """Walk through root_path and return a list (required_libs) and a dict of
+    lists (files_that_require_libs).
+    required_libs is the list of .so files that
+    are either unresolved or are resolved but are outside root_path.
+    files_that_require_libs is keyed by .so file and contains the relative
+    paths of all the files that require that .so file.
+
+    """
+    if not excludes:
+        excludes = []
+    excludes_compiled = [re.compile(x) for x in excludes]
+    required_libs = []
+    files_that_require_libs = {}
+    for dirpath, dirnames, filenames in os.walk(root_path):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            matching_excludes = [x for x in excludes_compiled if x.search(filepath)]
+            if matching_excludes:
+                continue
+            ldd_proc = subprocess.Popen(['ldd', filepath], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            ldd_output = ldd_proc.communicate()[0]
+            resolved_libs, unresolved_libs = list_of_libs_from_ldd_output(ldd_output)
+            for resolved_lib in resolved_libs:
+                if not is_subpath_of(resolved_lib, root_path):
+                    resolved_lib_base = os.path.basename(resolved_lib)
+                    required_libs.append(os.path.basename(resolved_lib))
+                    files_that_require_libs.setdefault(resolved_lib_base, [])
+                    files_that_require_libs[resolved_lib_base].append(os.path.relpath(filepath, start=root_path))
+            for unresolved_lib in unresolved_libs:
+                required_libs.append(unresolved_lib)
+                files_that_require_libs.setdefault(unresolved_lib, [])
+                files_that_require_libs[unresolved_lib].append(os.path.relpath(filepath, start=root_path))
+    return (required_libs, files_that_require_libs)
+
+
+def resolve_libs_to_rpms(list_of_libs):
+    """Resolve each lib in list_of_libs to the RPM that provides that lib.
+    Return 3 things:
+    rpms - a set of all rpms required to resolve all of list_of_libs.
+    libs_provided_by_rpms - a dict of lists keyed by rpm; the lists contain all
+    of the libs from list_of_libs that are provided by that rpm
+    rpm_that_provides_lib - a dict keyed by lib; value is the first rpm that provides that lib
+
+    """
+    rpm_that_provides_lib = {}
+    libs_provided_by_rpms = {}
+    rpms = set()
+    for lib in list_of_libs:
+        repoquery_cmd = ['repoquery', '--plugins', '--whatprovides', '--queryformat', '%{NAME}.%{ARCH}', lib]
+        repoquery_proc = subprocess.Popen(repoquery_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        repoquery_output = repoquery_proc.communicate()[0]
+        if repoquery_proc.returncode != 0:
+            print >> sys.stderr, "Warning: repoquery for %s did not complete successfully: %d" % (lib, repoquery_proc.returncode)
+            continue
+        if not repoquery_output.strip():
+            print >> sys.stderr, "Warning: repoquery for %s did not find any packages" % (lib)
+            continue
+        split_output = [line.strip() for line in repoquery_output.split("\n") if line]
+        first_rpm = split_output[0]
+        rpms_for_this_lib = set(split_output)
+        rpm_that_provides_lib[lib] = first_rpm
+        for rpm in rpms_for_this_lib:
+            libs_provided_by_rpms.setdefault(rpm, [])
+            libs_provided_by_rpms[rpm].append(lib)
+        rpms.update(rpms_for_this_lib)
+
+    return (rpms, libs_provided_by_rpms, rpm_that_provides_lib)
+
+
+def join_list_with_limit(joinstr, thelist, limit=0):
+    """Return a string made by joining a list. If the list has more than limit
+    entries, only show the first few and add text containing how many others
+    there are.
+
+    Special case: if limit is 0, then all elements are added.
+
+    >>> join_list_with_limit(",", ["a", "b", "c", "d"], 4)
+    "a,b,c,d"
+    >>> join_list_with_limit(",", ["a", "b", "c", "d"], 2)
+    "a,b (+ 2 other(s))"
+    """
+    ll = len(thelist)
+    if not limit or ll <= limit:
+        return joinstr.join(thelist)
+    elif limit < 0:
+        raise ValueError("Negative limit specified")
+    else:
+        return joinstr.join(thelist[0:limit-1]) + " (+ %d other(s))" % (ll - limit)
+
+
+def get_options(args):
+    parser = OptionParser()
+    parser.add_option("-l", "--limit-display", dest="limit_display", type="int", metavar="NUM", default=4,
+                      help="Limit displayed number of files that require each library to NUM."
+                      " Default is %default. 0 shows all files.")
+    parser.add_option("-e", "--exclude", dest="excludes", action="append", metavar="REGEX",
+                      help="Exclude files matching REGEX from being checked for dependencies."
+                      " May be specified multiple times.")
+    parser.add_option("-n", "--norpms", "--no-resolve-rpms", dest="resolve_rpms", action="store_false", default=True,
+                      help="Do not try to find which rpms provide libraries."
+                      " Mutually exclusive with --list-rpms")
+    parser.add_option("--list-rpms", action="store_true", dest="list_rpms", default=False,
+                      help="Do not display a table, just list the RPMs that are needed."
+                      " Mutually exclusive with --no-resolve-rpms")
+    parser.add_option("-q", "--noheader", "--no-header", dest="header", action="store_false", default=True,
+                      help="Do not print table header")
+
+    options, pos_args = parser.parse_args(args)
+
+    if not options.resolve_rpms and options.list_rpms:
+        print >> sys.stderr, "--no-resolve-rpms and --list-rpms are mutually exclusive!"
+        sys.exit (2)
+
+    return options, pos_args
+
+
+def print_library_table(lib_dependencies, files_that_require_libs, rpm_that_provides_lib=None, header=True, limit_display=0):
+    if header:
+        if not rpm_that_provides_lib:
+            print "%-23s %s" % ("Library", "Required by")
+            print "%-23s %s" % ("-------", "-----------")
+        else:
+            print "%-23s %-23s %s" % ("Library", "RPM", "Required by")
+            print "%-23s %-23s %s" % ("-------", "---", "-----------")
+
+    for ldep in sorted(list(lib_dependencies)):
+        ldep_base = os.path.basename(ldep)
+        files_that_require_ldep = sorted(files_that_require_libs[ldep_base])
+        required_by_list = join_list_with_limit(", ", files_that_require_ldep, limit_display)
+
+        if rpm_that_provides_lib:
+            rpm_that_provides_ldep = rpm_that_provides_lib.get(ldep, "???")
+            print "%-23s %-23s %s" % (ldep, rpm_that_provides_ldep, required_by_list)
+        else:
+            print "%-23s %s" % (ldep, required_by_list)
+
+
+def main(argv):
+    options, pos_args = get_options(argv[1:])
+
+
+    tarball_root_path = os.getcwd()
+    if len(pos_args) > 0:
+        tarball_root_path = os.path.realpath(pos_args[0])
+
+    required_libs, files_that_require_libs = find_required_libs(tarball_root_path, excludes=options.excludes)
+    required_libs = set(required_libs)
+    provided_libs = set(find_provided_libs(tarball_root_path))
+
+    lib_dependencies = required_libs - provided_libs
+
+    rpms, libs_provided_by_rpms, rpm_that_provides_lib = set(), {}, {}
+
+    if options.resolve_rpms:
+        if os.system("which repoquery > /dev/null 2>&1") == 0:
+            rpms, libs_provided_by_rpms, rpm_that_provides_lib = resolve_libs_to_rpms(lib_dependencies)
+        else:
+            print >> sys.stderr, """\
+WARNING: repoquery binary not found in $PATH -- unable to resolve library
+dependencies to RPMs. Please install repoquery, in the yum-utils package,
+or pass --no-resolve to disable this warning."""
+
+        if options.list_rpms:
+            print "\n".join(sorted(list(rpms)))
+            return 0
+
+    print_library_table(
+        lib_dependencies,
+        files_that_require_libs,
+        rpm_that_provides_lib,
+        options.header,
+        options.limit_display)
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+
