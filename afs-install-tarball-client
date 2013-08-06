@@ -43,8 +43,8 @@ main () {
     set +o errexit
 
     message "Extraction successful. If this was the latest release, please"
-    message "update the 'latest' symlink by running:"
-    message "\tln -snf $VR $INSTALL_ROOT/latest"
+    message "update the 'current' symlink by running:"
+    message "\tln -snf $VR $INSTALL_ROOT/current"
     newline
 }
 
