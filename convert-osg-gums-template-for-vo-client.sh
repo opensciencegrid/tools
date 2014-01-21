@@ -85,7 +85,7 @@ ssh $UNPRIV_USER@$HOSTNAME "
   . /etc/bashrc
   set -e
   echo \"$CERT_PW\" | /usr/krb5/bin/get-cert >&2
-  echo \"$CERT_PW\" | grid-proxy-init -pwstdin >&2
+# echo \"$CERT_PW\" | grid-proxy-init -pwstdin >&2
   echo | openssl pkcs12 -in /tmp/x509up_u\$UID.p12 -out /tmp/cert\$UID.crt.pem \
                         -clcerts -nokeys -password stdin >&2
 
