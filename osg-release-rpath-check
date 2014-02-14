@@ -1,0 +1,51 @@
+#!/bin/bash
+set -e
+
+# runs rpmlint against all the latest binary rpms from the osg-release repos.
+# keeps all rpmlint logs, but in particular reports rpms with rpath errors.
+
+koji_baseurl=http://koji-hub.batlab.org
+arches=(
+  x86_64
+  i386
+  #noarch
+  #src
+)
+
+lint_filter=binary-or-shlib-defines-rpath
+
+tmpd=rpath-check.$(date +%Y%m%d-%H%M%S)
+mkdir "$tmpd"
+cd "$tmpd"
+
+for tag in osg-{3.1,3.2,upcoming}-el{5,6}-release; do
+for arch in ${arches[@]}; do
+
+  echo "retrieving latest $arch rpms for $tag..."
+  osg-koji list-tagged --paths --rpms --latest --arch=$arch $tag \
+  | tee rpmlist.$tag.$arch.log \
+  | wget --base="$koji_baseurl" -i- -nv -x -a wget.$tag.$arch.log
+
+  if [[ ! -s rpmlist.$tag.$arch.log ]]; then
+    echo "(none)"
+    echo
+    continue
+  fi
+
+  echo "running rpmlint..."
+  find -name '*.rpm' | sort | xargs rpmlint \
+  | tee rpmlint.$tag.$arch.log              \
+  | awk '$3 == lint' lint=$lint_filter      \
+  | awk -F: '!u[$1]++ {print $1}'           \
+  | tee rpaths.$tag.$arch.log               \
+  | awk '{print "rpath:", $1}'
+  
+  rm -rf "${koji_baseurl#*://}"
+  echo
+
+done
+done
+
+echo "Results left in: $tmpd"
+echo
+
