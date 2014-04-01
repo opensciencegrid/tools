@@ -136,9 +136,9 @@ cd - >/dev/null
 SECTION "running fetch-crl (may take a while...)"
 
 case $el in
-  5) /usr/sbin/fetch-crl3 || :
+  5) /usr/sbin/fetch-crl3 -p 20 -T 10 || :
      /sbin/service tomcat5 start ;;
-  6) /usr/sbin/fetch-crl || :
+  6) /usr/sbin/fetch-crl -p 20 -T 10 || :
      /sbin/service tomcat6 start ;;
 esac
 
