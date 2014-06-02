@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Script to back up to a remote location the important directories in the OSG's
+# Koji infrastructure. Should be run on host-3.
+
+REMOTE_LOGIN=
+REMOTE_HOST=
+REMOTE_BASE_PATH=
+LOCAL_BACKUP_ROOT=/export/backup
+KOJIHOST=koji-hub.batlab.org
+DBHOST=db-01.batlab.org
+RETRIES=10
+RETRY_WAIT=60
+
+
+tempdir=$(mktemp -d)
+today=$(date +%F)
+workdir=$tempdir/$today
+todays_backups=$LOCAL_BACKUP_ROOT/$today
+remote_path=$REMOTE_LOGIN@$REMOTE_HOST:$REMOTE_BASE_PATH/$today
+
+set -e
+cd $todays_backups
+mkdir -p $workdir
+tar czpf $workdir/etc.tar.gz $KOJIHOST/rootfs/etc
+tar czpf $workdir/roothome.tar.gz $KOJIHOST/rootfs/root
+tar czpf $workdir/pgsql.tar.gz $DBHOST/rootfs/var/lib/pgsql
+tar czpf $workdir/pgsql-backup.tar.gz $DBHOST/rootfs/var/lib/pgsql-backup
+
+rsync -rzq $workdir/ $remote_path
+
+set +e
+
+trap "echo Interrupted; exit 3;" SIGINT SIGTERM
+
+for (( count=0; count < RETRIES; count++ )); do
+    rsync -rzq --partial --partial-dir=.rsync-partial -e "ssh -o ServerAliveInterval=20" $KOJIHOST/kojifs/packages/ $remote_path/packages && break
+
+    sleep $RETRY_WAIT
+done
+
+rm -rf $tempdir
+
+if [[ $count -ge $RETRIES ]]; then
+    echo "Hit maximum number of retries ($RETRIES), giving up" >&2
+    exit 1
+fi
+
