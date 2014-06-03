@@ -2,7 +2,10 @@
 
 # Script to back up to a remote location the important directories in the OSG's
 # Koji infrastructure. Should be run on host-3.
+# I get around the "what if today's backups aren't done yet" problem by sending
+# yesterday's backups instead. Should be fine since we run this once a week.
 
+# Set these:
 REMOTE_LOGIN=
 REMOTE_HOST=
 REMOTE_BASE_PATH=
@@ -12,37 +15,72 @@ DBHOST=db-01.batlab.org
 RETRIES=10
 RETRY_WAIT=60
 
+################################################################################
+
+die () {
+    echo "$@" >&2
+    exit 1
+}
+
+require_var () {
+    local var="${1?Usage: require_var VAR}"
+    eval "[[ -n \$$var ]]" || die "$var not specified"
+}
+
+rsync_with_retry_or_die () {
+    local src_path="$1" dest_path="$2" link_path="${3-}" count=0 rsync_opts ret
+    rsync_opts=(-rzq --partial --partial-dir=.rsync-partial -e "ssh -o ServerAliveInterval=20")
+    if [[ -n $link_path ]]; then
+        rsync_opts+=(--link-dest="$link_path")
+    fi
+    while true; do
+        rsync "${rsync_opts[@]}" "$src_path" "$REMOTE_LOGIN@$REMOTE_HOST:$dest_path"; ret=$?
+        if [[ $ret -eq 0 ]]; then
+            return 0
+        fi
+        if [[ $count -ge $RETRIES ]]; then
+            die "Hit max retries while rsyncing $src_path to $REMOTE_LOGIN@$REMOTE_HOST:$dest_path; giving up"
+        else
+            (( count++ ))
+            sleep $RETRY_WAIT
+        fi
+    done
+}
+
+################################################################################
+set -o nounset
+
+# Sanity check
+require_var REMOTE_LOGIN
+require_var REMOTE_HOST
+require_var REMOTE_BASE_PATH
+require_var LOCAL_BACKUP_ROOT
+require_var KOJIHOST
+require_var DBHOST
+require_var RETRIES
+require_var RETRY_WAIT
 
 tempdir=$(mktemp -d)
-today=$(date +%F)
-workdir=$tempdir/$today
-todays_backups=$LOCAL_BACKUP_ROOT/$today
-remote_path=$REMOTE_LOGIN@$REMOTE_HOST:$REMOTE_BASE_PATH/$today
+backup_date=$(date +%F -d 'yesterday')
+last_backup_date=$(date +%F -d '8 days ago')
+workdir=$tempdir/$backup_date
+todays_backups=$LOCAL_BACKUP_ROOT/$backup_date
+remote_link_path=$REMOTE_BASE_PATH/$last_backup_date
+remote_path=$REMOTE_BASE_PATH/$backup_date
 
-set -e
-cd $todays_backups
-mkdir -p $workdir
-tar czpf $workdir/etc.tar.gz $KOJIHOST/rootfs/etc
-tar czpf $workdir/roothome.tar.gz $KOJIHOST/rootfs/root
-tar czpf $workdir/pgsql.tar.gz $DBHOST/rootfs/var/lib/pgsql
-tar czpf $workdir/pgsql-backup.tar.gz $DBHOST/rootfs/var/lib/pgsql-backup
-
-rsync -rzq $workdir/ $remote_path
-
-set +e
+set -o errexit
+cd "$todays_backups"
+mkdir -p "$workdir"
+tar czpf "$workdir/etc.tar.gz"           "$KOJIHOST/rootfs/etc"
+tar czpf "$workdir/roothome.tar.gz"      "$KOJIHOST/rootfs/root"
+tar czpf "$workdir/pgsql.tar.gz"         "$DBHOST/rootfs/var/lib/pgsql"
+tar czpf "$workdir/pgsql-backup.tar.gz"  "$DBHOST/rootfs/var/lib/pgsql-backup"
+[[ -d $KOJIHOST/kojifs/packages ]]
+set +o errexit
 
 trap "echo Interrupted; exit 3;" SIGINT SIGTERM
-
-for (( count=0; count < RETRIES; count++ )); do
-    rsync -rzq --partial --partial-dir=.rsync-partial -e "ssh -o ServerAliveInterval=20" $KOJIHOST/kojifs/packages/ $remote_path/packages && break
-
-    sleep $RETRY_WAIT
-done
+rsync_with_retry_or_die "$workdir/"                   "$remote_path"
+rsync_with_retry_or_die "$KOJIHOST/kojifs/packages/"  "$remote_path/packages"  "$remote_link_path/packages"
 
 rm -rf $tempdir
-
-if [[ $count -ge $RETRIES ]]; then
-    echo "Hit maximum number of retries ($RETRIES), giving up" >&2
-    exit 1
-fi
 
