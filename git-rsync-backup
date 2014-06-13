@@ -1,0 +1,143 @@
+#!/bin/bash
+
+# Safely back up a git repository via rsync. (Only local paths are supported).
+# Runs git-fsck on the source repo first to verify nothing's wrong, then locks
+# the source repo (via an update hook) and copies the entire repo via rsync.
+# Then runs git-fsck on the backup repo. If either the rsync or the git-fsck
+# fail, they are retried (up to 10 times). Assuming all is successful, unlocks
+# the source and backup repos.
+#
+# Works on both bare and non-bare repositories.
+
+
+# rsync+git-fsck idea from this git mailing list post:
+# http://marc.info/?l=git&m=136422341014631&w=2
+
+LOCK_MSG="Locked for backups"
+
+die () {
+    echo "$@" >&2
+    exit 1
+}
+
+realpath () {
+    # Portable way of resolving symlinks, relative paths, etc.
+    python -c 'import os,sys; sys.stdout.write(os.path.realpath(sys.argv[1])+"\n")' "$1"
+}
+
+lock_repo () {
+    local gitdir hook hooksave
+
+    gitdir=$1
+    hook=$gitdir/hooks/update
+    hooksave=$hook.backupsave
+
+    (
+        set -e
+        if [[ -e $hook ]]; then
+            mv -f "$hook" "$hooksave"
+        fi
+
+        echo > "$hook" \
+            "#!/bin/sh
+             echo $LOCK_MSG
+             exit 1"
+
+        chmod +x "$hook"
+    )
+    return $?
+}
+
+unlock_repo () {
+    local gitdir hook hooksave
+
+    gitdir=$1
+    hook=$gitdir/hooks/update
+    hooksave=$hook.backupsave
+
+    if [[ ! -e $hook ]] || ! grep -qF "$LOCK_MSG" "$hook"; then
+        echo "$gitdir not locked"
+        return 0
+    fi
+
+    (
+        set -e
+        rm -f "$hook"
+        if [[ -e $hooksave ]]; then
+            mv -f "$hooksave" "$hook"
+        fi
+    )
+    return $?
+}
+
+fsck_repo () {
+    local gitdir fsckout fsckret
+
+    gitdir=$1
+    fsckout=$(git --git-dir="$gitdir" fsck --no-dangling --full --strict 2>&1)
+    fsckret=$?
+
+    if (( fsckret != 0 )) || \
+        printf "%s\n" "$fsckout" |  grep -q "error|fatal|mismatch|unreachable|missing|corrupt"
+    then
+        echo "fsck of $gitdir failed. Output:"
+        printf "%s\n" "$fsckout"
+        return 1
+    fi
+    return 0
+}
+
+main() {
+    if (( $# != 2 )) || [[ ${1-} == -h ]]; then
+        echo "Usage: $0 <from> <to>"
+        exit 2
+    fi
+
+    local from to to_parent
+    from=$(realpath "$1")
+    to=$(realpath "$2")
+    to_parent=$(dirname "$to")
+
+    if [[ $from == $to ]]; then
+        die "Backup path is the same as source path!"
+    fi
+    if [[ ! ( -w $to_parent && -x $to_parent ) ]]; then
+        die "Cannot write to $to_parent !"
+    fi
+
+    local from_gitdir to_gitdir
+    if [[ -d $from/.git ]]; then
+        # not a bare repo
+        from_gitdir=$from/.git
+        to_gitdir=$to/.git
+    else
+        # bare repo
+        from_gitdir=$from
+        to_gitdir=$to
+    fi
+
+    # See if $from_gitdir does actually point to a git dir
+    git --git-dir="$from_gitdir" show-ref HEAD > /dev/null || exit $?
+
+    fsck_repo "$from_gitdir" || die "fsck of source repo failed! Bailing."
+
+    lock_repo "$from_gitdir" || die "Locking source repo failed!"
+
+    local tries
+    for (( tries = 10; tries > 0; tries-- )); do
+        rsync --archive --delete-after --partial "$from/" "$to" && \
+            fsck_repo "$to_gitdir" && \
+            break
+    done
+
+    (( tries == 0 )) && die "Backups failed!
+        Source repo will remain locked to allow investigation."
+
+    unlock_repo "$from_gitdir" || die "Unlocking source repo failed!"
+
+    # This one's not fatal
+    unlock_repo "$to_gitdir" || echo "Unlocking backup repo failed." >&2
+}
+
+main "$@"
+
