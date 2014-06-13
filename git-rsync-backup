@@ -20,9 +20,22 @@ die () {
     exit 1
 }
 
+unlock_and_die () {
+    unlock_repo "$1" || echo "Unlocking repo at $1 failed" >&2
+    shift
+    die "$@"
+}
+
 realpath () {
     # Portable way of resolving symlinks, relative paths, etc.
     python -c 'import os,sys; sys.stdout.write(os.path.realpath(sys.argv[1])+"\n")' "$1"
+}
+
+load_sleep () {
+    # sleeps based on load average
+    local multiplier
+    multiplier=${1:-5}
+    sleep $(uptime | grep -o 'load averages:.*' | awk "{print $multiplier * (1 + \$3)}")
 }
 
 lock_repo () {
@@ -35,7 +48,13 @@ lock_repo () {
     (
         set -e
         if [[ -e $hook ]]; then
-            mv -f "$hook" "$hooksave"
+            if grep -qF "$LOCK_MSG" "$hook"; then
+                echo "$gitdir already locked"
+                echo "Remove $hook to break lock"
+                return 1
+            else
+                mv -f "$hook" "$hooksave"
+            fi
         fi
 
         echo > "$hook" \
@@ -78,10 +97,10 @@ fsck_repo () {
     fsckret=$?
 
     if (( fsckret != 0 )) || \
-        printf "%s\n" "$fsckout" |  grep -q "error|fatal|mismatch|unreachable|missing|corrupt"
+        echo "$fsckout" |  grep -q "error|fatal|mismatch|unreachable|missing|corrupt"
     then
         echo "fsck of $gitdir failed. Output:"
-        printf "%s\n" "$fsckout"
+        echo "$fsckout"
         return 1
     fi
     return 0
@@ -101,8 +120,9 @@ main() {
     if [[ $from == $to ]]; then
         die "Backup path is the same as source path!"
     fi
-    if [[ ! ( -w $to_parent && -x $to_parent ) ]]; then
-        die "Cannot write to $to_parent !"
+    mkdir -p "$to"
+    if [[ ! ( -w $to && -x $to ) ]]; then
+        die "Cannot write to $to !"
     fi
 
     local from_gitdir to_gitdir
@@ -117,25 +137,37 @@ main() {
     fi
 
     # See if $from_gitdir does actually point to a git dir
+    # Git will give a suitable error message if it isn't
     git --git-dir="$from_gitdir" show-ref HEAD > /dev/null || exit $?
 
-    fsck_repo "$from_gitdir" || die "fsck of source repo failed! Bailing."
+    lock_repo "$from_gitdir" || die "Locking source repo failed. Aborting backup."
 
-    lock_repo "$from_gitdir" || die "Locking source repo failed!"
-
+    # Wait for any running git processes to finish
     local tries
-    for (( tries = 10; tries > 0; tries-- )); do
-        rsync --archive --delete-after --partial "$from/" "$to" && \
-            fsck_repo "$to_gitdir" && \
+    for (( tries = 20; tries > 0; tries-- )); do
+        lsof +D "$from" | awk '{print $1}' | grep -q git || break
+        load_sleep 10
+    done
+    if (( tries == 0 )); then
+        unlock_and_die "$from_gitdir" "git operation still running on source repo. Aborting backup."
+    fi
+
+    local output
+    for (( tries = 20; tries > 0; tries-- )); do
+        output=$(rsync --archive --quiet --delete-after --partial "$from/" "$to" 2>&1 && \
+                 fsck_repo "$to_gitdir" 2>&1)
+        ret=$?
+        if (( ret == 0 )); then
             break
+        fi
+        load_sleep 10
     done
 
-    (( tries == 0 )) && die "Backups failed!
-        Source repo will remain locked to allow investigation."
+    if (( tries == 0 )); then
+        unlock_and_die "$from_gitdir" "Backups failed! Output from last try: $output"
+    fi
 
-    unlock_repo "$from_gitdir" || die "Unlocking source repo failed!"
-
-    # This one's not fatal
+    unlock_repo "$from_gitdir" || echo "Unlocking source repo failed." >&2
     unlock_repo "$to_gitdir" || echo "Unlocking backup repo failed." >&2
 }
 
