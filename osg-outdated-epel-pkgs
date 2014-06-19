@@ -1,0 +1,151 @@
+#!/usr/bin/python
+
+"""
+Usage:
+  %s [3.1|3.2] [el5|el6] [development|testing|release]
+
+Default is:
+  %s el%s %s
+
+Options:
+  --make-cache     save epelX.html and osg-3.X-elX-XXX.list for offline use
+  --cached         used cached files instead of pulling live versions
+  --color          colorize version differences
+  --show-all       show versions even for non-outdated packages
+"""
+
+import sys
+import os
+import re
+import rpm
+import urllib2
+try:
+    from rpmUtils.miscutils import stringToVersion
+except ImportError:
+    from miscutils import stringToVersion
+
+
+SERIES = '3.2'
+EL     = '6'
+TAG    = 'release'
+
+use_cached = False
+make_cache = False
+use_color  = False
+show_all   = False
+
+def usage():
+    print __doc__ % (os.path.basename(__file__), SERIES, EL, TAG)
+    sys.exit()
+
+for arg in sys.argv[1:]:
+    if re.search(r'^el[5-9]$', arg):
+        EL = arg[2]
+    elif re.search(r'^[3-9]\.[0-9]$', arg):
+        SERIES = arg
+    elif re.search(r'^(upcoming-)?(development|testing|release)$', arg):
+        TAG = arg
+    elif arg == '--cached':
+        use_cached = True
+    elif arg == '--make-cache':
+        make_cache = True
+    elif arg == '--color':
+        use_color = True
+    elif arg == '--show-all':
+        show_all = True
+    else:
+        usage()
+
+if use_cached and make_cache:
+    usage()
+
+def strip_dist_tag(seq, dist_pfx):
+    pat = r'\.%s[^-]*$' % dist_pfx
+    return [ re.sub(pat, '', nvr) for nvr in seq ]
+
+def extract_href_rpm(line):
+    m = re.search(r'<a href="([^"]+(-[^-"]+){2})\.src\.rpm"', line)
+    return m and m.groups()[0]
+
+def get_handle(fn, arg, cache_name):
+    if use_cached:
+        handle = open(cache_name)
+    else:
+        handle = fn(arg)
+        if make_cache:
+            open(cache_name, 'w').write(handle.read())
+            print "Wrote:", cache_name
+            handle = []
+
+    return handle
+
+def get_epel_list():
+    epel_url = "http://dl.fedoraproject.org/pub/epel/%s/SRPMS/" % EL
+    cache_name = 'epel%s.html' % EL
+
+    handle = get_handle(urllib2.urlopen, epel_url, cache_name)
+
+    nvrs = filter(None, map(extract_href_rpm, handle))
+    return strip_dist_tag(nvrs, 'el%s' % EL)
+
+def get_osg_list():
+    osg_tag = "osg-%s-el%s-%s" % (SERIES, EL, TAG)
+    cmd = "osg-koji list-tagged --latest --rpms %s" % osg_tag
+    cache_name = osg_tag + '.list'
+
+    handle = get_handle(os.popen, cmd, cache_name)
+
+    nvrs = [ line[:-5] for line in handle if line.endswith(".src\n") ]
+    return strip_dist_tag(nvrs, 'osg')
+
+def rpmvercmp(a,b):
+    return rpm.labelCompare(*[stringToVersion(x) for x in (a,b)])
+
+def n_vr(nvr):
+    n,v,r = nvr.rsplit("-",2)
+    return n, v+'-'+r
+
+def nvrmap(seq):
+    return dict( n_vr(nvr) for nvr in seq )
+
+if make_cache:
+    get_epel_list()
+    get_osg_list()
+    sys.exit()
+
+epel_map = nvrmap(get_epel_list())
+osg_map  = nvrmap(get_osg_list())
+
+def colorize(color, *seq):
+    return [ "\x1b[%sm%s\x1b[0m" % (color, x) for x in seq ]
+
+def colorize_vr(vr1, vr2):
+    v1,r1 = vr1.split('-')
+    v2,r2 = vr2.split('-')
+
+    if v1 != v2:
+        v1,v2 = colorize('1;32', v1, v2)
+    elif r1 != r2:
+        r1,r2 = colorize('1;34', r1, r2)
+
+    return map('-'.join, [[v1,r1],[v2,r2]])
+
+pkg_diffs = []
+for pkg in sorted(osg_map):
+    if pkg in epel_map:
+        vrcmp = rpmvercmp(osg_map[pkg], epel_map[pkg])
+        if vrcmp < 0 or show_all:
+            pkg_diffs.append([pkg, osg_map[pkg], epel_map[pkg]])
+
+if pkg_diffs:
+    pkg_diffs[:0] = [["Package", "OSG", "EPEL"]]
+    widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
+    pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
+    for i,row in enumerate(pkg_diffs):
+        spacing = [ w-len(x) for x,w in zip(row,widths) ]
+        if use_color and i > 1:
+            row[1:] = colorize_vr(*row[1:])
+        print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
+else:
+    print "No package version differences"
+
