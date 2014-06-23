@@ -44,19 +44,28 @@ if [[ $(git rev-parse master) = $(git rev-parse trunk) ]]; then
   git branch -rd trunk
 fi
 
+for x in $(git branch -r | grep @); do
+  # remove superfluous git-svn 'branch points'
+  if git branch -a --contains refs/remotes/$x | grep -vq @; then
+    git branch -rD $x
+  fi
+done
+
 filter_branch
 for x in $(git branch -r); do
-  filter_branch "$x"
+  filter_branch refs/remotes/"$x"
   case $x in
-      tags/* ) git tag "${x#tags/}" "$x" ;;
-    *@[1-9]* ) git tag "$x" "$x" ;;
+      tags/*@[1-9]* ) git tag "${x#tags/}"-tag refs/remotes/"$x" ;;
+      tags/* ) git tag "${x#tags/}" refs/remotes/"$x" ;;
+    *@[1-9]* ) git tag "$x" refs/remotes/"$x" ;;
            * ) git branch "$x" refs/remotes/"$x" ;;
   esac
   git branch -rd "$x"
 done
 
-git prune
-git gc
+rm -rf .git/svn .git/refs/original
+git reflog expire --expire=now --all
+git gc --prune=now
 
 if [[ $DISPLAY ]]; then
   gitk &
