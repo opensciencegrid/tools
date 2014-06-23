@@ -1,0 +1,37 @@
+#!/usr/bin/python
+
+# Originally written by Carl Edquist; hacked to bits by Tim Cartwright.
+
+import re
+import smtplib
+import time
+import urllib2
+
+RECIPIENTS = ('Tim Cartwright <cat@cs.wisc.edu>',)
+HEADERS = ('Open', 'In Progress', 'Ready for Testing', 'Ready for Release')
+URL = 'https://jira.opensciencegrid.org/browse/SOFTWARE/?selectedTab=com.atlassian.jira.jira-projects-plugin:issues-panel'
+
+# Adapted from Mat's aggregator/emailer.py script
+def mail_message(subject, message, recipients):
+    from_addr = 'Tim Cartwright <cat@cs.wisc.edu>'
+    payload = 'Subject: %s\r\n' % (subject)
+    payload += 'From: %s\r\n' % (from_addr)
+    payload += 'To: %s\r\n' % (', '.join(recipients))
+    payload += '\r\n'
+    payload += message
+    smtp = smtplib.SMTP('localhost')
+    smtp.sendmail(from_addr, recipients, payload)
+    smtp.quit()
+
+html = urllib2.urlopen(URL).read()
+
+text = 'JIRA Software tickets:\n\n'
+for h in HEADERS:
+    m = re.search(r'>%s<.*?<td class="cell-type-collapsed">(\d+)</td>' % h, html, re.S)
+    if m:
+        text += '    * %s: %s ()\n' % (h, m.groups()[0])
+text += '\n'
+text += 'Completed at %s\n' % (time.strftime('%Y-%m-%d %H:%M'))
+
+subject = 'JIRA ticket summary'
+mail_message(subject, text, RECIPIENTS)
