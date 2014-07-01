@@ -161,15 +161,21 @@ ssh $UNPRIV_USER@$HOSTNAME '
        -O /tmp/save.html
 '
 
+errorlog () {
+  echo "errors in $1:"
+  echo ---
+  grep ERROR "$@" | tail
+  echo ---
+  echo
+}
+
 if ! grep -o 'User group has been saved.' /tmp/save.html; then
   SECTION FAIL
 
   echo "... doesn't look like save worked, inspect with: links /tmp/save.html"
   echo
-  elog=/var/log/tomcat$el/gums-service-admin.log
-  echo "errors in $elog:"
-  grep ERROR $elog | tail
-  echo
+  errorlog /var/log/tomcat$el/gums-service-admin.log
+  errorlog /var/log/tomcat$el/catalina.out -A1
 fi
 
 SECTION fixing gums.config
