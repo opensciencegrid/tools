@@ -29,7 +29,7 @@ require_var () {
 
 rsync_with_retry_or_die () {
     local src_path="$1" dest_path="$2" link_path="${3-}" count=0 rsync_opts ret
-    rsync_opts=(-rzq --partial --partial-dir=.rsync-partial -e "ssh -o ServerAliveInterval=20")
+    rsync_opts=(-rzq --partial --partial-dir=.rsync-partial -e "ssh -i /root/osg_backup_key -o ServerAliveInterval=20")
     if [[ -n $link_path ]]; then
         rsync_opts+=(--link-dest="$link_path")
     fi
