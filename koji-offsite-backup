@@ -6,9 +6,9 @@
 # yesterday's backups instead. Should be fine since we run this once a week.
 
 # Set these:
-REMOTE_LOGIN=
-REMOTE_HOST=
-REMOTE_BASE_PATH=
+REMOTE_LOGIN=osgsoftware
+REMOTE_HOST=backup.grid.iu.edu
+REMOTE_BASE_PATH=/usr/local/backup/osgsoftware
 LOCAL_BACKUP_ROOT=/export/backup
 KOJIHOST=koji-hub.batlab.org
 DBHOST=db-01.batlab.org
