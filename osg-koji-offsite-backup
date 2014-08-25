@@ -16,6 +16,7 @@ KOJIHOST=koji-hub.batlab.org
 DBHOST=db-01.batlab.org
 RETRIES=10
 RETRY_WAIT=60
+# a copy of the key is under /p/vdt/private
 KEY=/root/osg_backup_key
 
 ################################################################################
