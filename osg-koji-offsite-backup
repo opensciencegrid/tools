@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This script is kept at https://vdt.cs.wisc.edu/svn/software/tools/osg-koji-offsite-backup
+
 # Script to back up to a remote location the important directories in the OSG's
 # Koji infrastructure. Should be run on host-3.
 # I get around the "what if today's backups aren't done yet" problem by sending
@@ -14,6 +16,7 @@ KOJIHOST=koji-hub.batlab.org
 DBHOST=db-01.batlab.org
 RETRIES=10
 RETRY_WAIT=60
+KEY=/root/osg_backup_key
 
 ################################################################################
 
@@ -29,7 +32,7 @@ require_var () {
 
 rsync_with_retry_or_die () {
     local src_path="$1" dest_path="$2" link_path="${3-}" count=0 rsync_opts ret
-    rsync_opts=(-rzq --partial --partial-dir=.rsync-partial -e "ssh -i /root/osg_backup_key -o ServerAliveInterval=20")
+    rsync_opts=(-rzq --partial --partial-dir=.rsync-partial -e "ssh -i $KEY -o ServerAliveInterval=20")
     if [[ -n $link_path ]]; then
         rsync_opts+=(--link-dest="$link_path")
     fi
