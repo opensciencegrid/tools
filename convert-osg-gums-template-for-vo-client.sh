@@ -101,12 +101,7 @@ SECTION setting up gums mysql db
 /usr/bin/gums-setup-mysql-database --user gums --host localhost:3306 \
     --password "$GUMSDBPW" --noprompt
 
-#echo yes | /usr/bin/gums-add-mysql-admin "$DN"
-
-# break open gums-add-mysql-admin script so we can avoid typing:
-
-sed -e "s%@ADMINDN@%$DN%g" /usr/lib/gums/sql/addAdmin.mysql \
-| mysql -u gums -p"$GUMSDBPW"
+/usr/bin/gums-add-mysql-admin -y "$DN" "$GUMSDBPW"
 
 # should be tomcat:tomcat owned already...
 cp "$gums_template" /etc/gums/gums.config
@@ -126,7 +121,7 @@ EOF
 SECTION "copying host certs for tomcat use"
 
 cd /etc/grid-security
-mv http/ http-
+mv http/ http- || :
 mkdir http
 cp host*.pem http/
 rename host http http/host*.pem
