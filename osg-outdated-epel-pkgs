@@ -10,7 +10,7 @@ Default is:
 Options:
   --make-cache     save epelX.html and osg-3.X-elX-XXX.list for offline use
   --cached         used cached files instead of pulling live versions
-  --color          colorize version differences
+  --[no-]color     colorize version differences (default = True if tty)
   --show-all       show versions even for non-outdated packages
 """
 
@@ -31,7 +31,7 @@ TAG    = 'release'
 
 use_cached = False
 make_cache = False
-use_color  = False
+use_color  = sys.stdout.isatty()
 show_all   = False
 
 def usage():
@@ -51,6 +51,8 @@ for arg in sys.argv[1:]:
         make_cache = True
     elif arg == '--color':
         use_color = True
+    elif arg == '--no-color':
+        use_color = False
     elif arg == '--show-all':
         show_all = True
     else:
