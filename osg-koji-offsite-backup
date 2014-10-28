@@ -1,90 +1,121 @@
-#!/bin/bash
+#!/usr/bin/env python
+REMOTE_LOGIN            = 'osgsoftware'
+REMOTE_HOST             = 'backup.grid.iu.edu'
+REMOTE_BASE_PATH        = '/usr/local/backup/osgsoftware'
+LOCAL_BACKUP_ROOT       = '/export/backup'
+KOJIHOST                = 'koji-hub.batlab.org'
+DBHOST                  = 'db-01.batlab.org'
+RETRIES                 = 10
+RETRY_WAIT              = 60
+# TODO change this
+NOTIFY_EMAILS           = ['matyas@cs.wisc.edu']
+KEY                     = '/root/osg_backup_key'
+BACKUP_TIME_OFFSET      = 86400     # 1 day
+LAST_BACKUP_TIME_OFFSET = 86400 * 8 # 1 week + 1 day
 
-# This script is kept at https://vdt.cs.wisc.edu/svn/software/tools/osg-koji-offsite-backup
 
-# Script to back up to a remote location the important directories in the OSG's
-# Koji infrastructure. Should be run on host-3.
-# I get around the "what if today's backups aren't done yet" problem by sending
-# yesterday's backups instead. Should be fine since we run this once a week.
 
-# Set these:
-REMOTE_LOGIN=osgsoftware
-REMOTE_HOST=backup.grid.iu.edu
-REMOTE_BASE_PATH=/usr/local/backup/osgsoftware
-LOCAL_BACKUP_ROOT=/export/backup
-KOJIHOST=koji-hub.batlab.org
-DBHOST=db-01.batlab.org
-RETRIES=10
-RETRY_WAIT=60
-# a copy of the key is under /p/vdt/private
-KEY=/root/osg_backup_key
+import glob
+import re
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
 
-################################################################################
 
-die () {
-    echo "$@" >&2
-    exit 1
-}
+class CompressError(Exception): pass
+class RsyncError(Exception): pass
 
-require_var () {
-    local var="${1?Usage: require_var VAR}"
-    eval "[[ -n \$$var ]]" || die "$var not specified"
-}
 
-rsync_with_retry_or_die () {
-    local src_path="$1" dest_path="$2" link_path="${3-}" count=0 rsync_opts ret
-    rsync_opts=(-rzq --partial --partial-dir=.rsync-partial -e "ssh -i $KEY -o ServerAliveInterval=20")
-    if [[ -n $link_path ]]; then
-        rsync_opts+=(--link-dest="$link_path")
-    fi
-    while true; do
-        rsync "${rsync_opts[@]}" "$src_path" "$REMOTE_LOGIN@$REMOTE_HOST:$dest_path"; ret=$?
-        if [[ $ret -eq 0 ]]; then
-            return 0
-        fi
-        if [[ $count -ge $RETRIES ]]; then
-            die "Hit max retries while rsyncing $src_path to $REMOTE_LOGIN@$REMOTE_HOST:$dest_path; giving up"
-        else
-            (( count++ ))
-            sleep $RETRY_WAIT
-        fi
-    done
-}
+def remote_run(commandstr):
+    proc = subprocess.Popen(
+        ['ssh', '-i', KEY, "%s@%s" % (REMOTE_LOGIN, REMOTE_HOST), "/bin/bash", "-c", commandstr],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = proc.communicate()
+    return proc.returncode, out, err
 
-################################################################################
-set -o nounset
 
-# Sanity check
-require_var REMOTE_LOGIN
-require_var REMOTE_HOST
-require_var REMOTE_BASE_PATH
-require_var LOCAL_BACKUP_ROOT
-require_var KOJIHOST
-require_var DBHOST
-require_var RETRIES
-require_var RETRY_WAIT
+def rsync(src_path, dest_path, rsync_opts=None):
+    rsync_command = ['rsync']
+    if rsync_opts:
+        rsync_command += rsync_opts
+    rsync_command += [src_path, dest_path]
+    proc = subprocess.Popen(rsync_command,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    out, err = proc.communicate()
 
-tempdir=$(mktemp -d)
-backup_date=$(date +%F -d 'yesterday')
-last_backup_date=$(date +%F -d '8 days ago')
-workdir=$tempdir/$backup_date
-todays_backups=$LOCAL_BACKUP_ROOT/$backup_date
-remote_link_path=$REMOTE_BASE_PATH/$last_backup_date
-remote_path=$REMOTE_BASE_PATH/$backup_date
+    return proc.returncode, out, err
 
-set -o errexit
-cd "$todays_backups"
-mkdir -p "$workdir"
-tar czpf "$workdir/etc.tar.gz"           "$KOJIHOST/rootfs/etc"
-tar czpf "$workdir/roothome.tar.gz"      "$KOJIHOST/rootfs/root"
-tar czpf "$workdir/pgsql.tar.gz"         "$DBHOST/rootfs/var/lib/pgsql"
-tar czpf "$workdir/pgsql-backup.tar.gz"  "$DBHOST/rootfs/var/lib/pgsql-backup"
-[[ -d $KOJIHOST/kojifs/packages ]]
-set +o errexit
 
-trap "echo Interrupted; exit 3;" SIGINT SIGTERM
-rsync_with_retry_or_die "$workdir/"                   "$remote_path"
-rsync_with_retry_or_die "$KOJIHOST/kojifs/packages/"  "$remote_path/packages"  "$remote_link_path/packages"
+def checked_rsync_with_retry(src_path, remote_path, links=None):
+    rsync_opts = ['-rzq', '-e', '-i ' + KEY]
+    if isinstance(links, basestring):
+        links = [links]
+    if links:
+        rsync_opts += ['--link-dest=' + x for x in links]
 
-rm -rf $tempdir
+    dest_path = "%s@%s:%s" % (REMOTE_LOGIN, REMOTE_HOST, remote_path)
+    count = 0
+    while True:
+        ret, out, err = rsync(src_path, dest_path, rsync_opts)
+        if ret == 0:
+            return
+        if count >= RETRIES:
+            raise RsyncError("Hit max retries while rsyncing %(src_path)s to %(dest_path)s; giving up" % locals())
+        else:
+            count += 1
+            time.sleep(RETRY_WAIT)
+
+
+def checked_compress(tarball, directory):
+    ret = subprocess.call(['tar', '-czpf', tarball, directory])
+
+    if ret != 0:
+        raise CompressError("Error compressing %(directory)s to %(tarball)s" % locals())
+
+
+def main(argv):
+    start_time = time.time()
+
+    backup_date = time.strftime("%Y-%m-%d", time.localtime(time.time() - BACKUP_TIME_OFFSET))
+    last_backup_date = time.strftime("%Y-%m-%d", time.localtime(time.time() - LAST_BACKUP_TIME_OFFSET))
+
+    tempdir = tempfile.mkdtemp(prefix='osg-koji-backup')
+    workdir = os.path.join(tempdir, backup_date)
+    yesterdays_backups = os.path.join(LOCAL_BACKUP_ROOT, backup_date)
+    remote_path = os.path.join(REMOTE_BASE_PATH, backup_date)
+    remote_link_path = os.path.join(REMOTE_BASE_PATH, last_backup_date)
+
+    os.makedirs(workdir)
+
+    olddir = os.getcwd()
+    try:
+        os.chdir(yesterdays_backups)
+
+        for tarball, directory in \
+            [('etc.tar.gz'          , os.path.join(KOJIHOST , 'rootfs/etc')),
+             ('roothome.tar.gz'     , os.path.join(KOJIHOST , 'rootfs/root')),
+             ('pgsql.tar.gz'        , os.path.join(DBHOST   , 'rootfs/var/lib/pgsql')),
+             ('pgsql-backup.tar.gz' , os.path.join(DBHOST   , 'rootfs/var/lib/pgsql-backup'))]:
+
+            checked_compress(os.path.join(workdir, tarball), directory)
+
+        packages_dir = os.path.join(KOJIHOST, 'kojifs/packages')
+        if not os.path.isdir(packages_dir):
+            raise Exception(pacakges_dir + ' is not a directory')
+
+        checked_rsync_with_retry(workdir, remote_path)
+        checked_rsync_with_retry(packages_dir, os.path.join(remote_path, 'packages'),
+                                 links=[os.path.join(remote_link_path, 'packages')])
+    finally:
+        os.chdir(olddir)
+        shutil.rmtree(tempdir)
+
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
 
