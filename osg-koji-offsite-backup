@@ -51,7 +51,8 @@ def rsync(src_path, dest_path, rsync_opts=None):
 
 
 def checked_rsync_with_retry(src_path, remote_path, links=None):
-    rsync_opts = ['-rzq', '-e', '-i ' + KEY]
+    rsync_opts = ['--recursive', '--compress', '--quiet', '--rsh=ssh -i %(KEY)s' % globals()]
+
     if isinstance(links, basestring):
         links = [links]
     if links:
