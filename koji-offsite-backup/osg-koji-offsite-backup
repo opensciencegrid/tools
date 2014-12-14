@@ -2,7 +2,7 @@
 
 # Requires Python 2.6+
 
-DRYRUN = True
+DRYRUN = False
 
 REMOTE_LOGIN            = 'osgsoftware'
 REMOTE_HOST             = 'backup.grid.iu.edu'
@@ -12,8 +12,7 @@ KOJIHOST                = 'koji-hub.batlab.org'
 DBHOST                  = 'db-01.batlab.org'
 RETRIES                 = 10
 RETRY_WAIT              = 60
-#NOTIFY_EMAILS           = [x + '@cs.wisc.edu' for x in ['blin', 'cat', 'edquist', 'matyas', 'tim']]
-NOTIFY_EMAILS           = [x + '@cs.wisc.edu' for x in ['matyas']]
+NOTIFY_EMAILS           = [x + '@cs.wisc.edu' for x in ['blin', 'cat', 'edquist', 'matyas', 'tim']]
 KEY                     = '/root/osg_backup_key'
 BACKUP_TIME_OFFSET      = 86400     # 1 day
 LAST_BACKUP_TIME_OFFSET = 86400 * 8 # 1 week + 1 day
