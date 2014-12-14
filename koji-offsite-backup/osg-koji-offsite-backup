@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+# Requires Python 2.6+
+
 DRYRUN = True
 
 REMOTE_LOGIN            = 'osgsoftware'
@@ -18,65 +21,105 @@ LAST_BACKUP_TIME_OFFSET = 86400 * 8 # 1 week + 1 day
 DEDUPE_SCRIPT           = "%s/dedupe" % REMOTE_BASE_PATH
 REMOTE_LOGIN_HOST       = "%s@%s" % (REMOTE_LOGIN, REMOTE_HOST)
 
-
+MAIL_DELIVERY_METHOD    = 'sendmail'  # either 'sendmail' or 'smtp'
 
 import glob
 import re
 import os
 import shutil
-import subprocess
+from subprocess import Popen, PIPE, STDOUT
 import sys
 import tempfile
 import time
 
-import smtplib
 import socket
-try:
-    from email.mime.text import MIMEText
-except ImportError:
-    from email.MIMEText import MIMEText
+from email.mime.text import MIMEText
 
 
 class Error(Exception): pass
-class CompressError(Error): pass
-class RsyncError(Error):
-    def __init__(self, msg, returncode=None, outerr=None):
-        Exception.__init__(self, msg)
+class CommandError(Error):
+    def __init__(self, command, returncode, outerr):
+        Error.__init__(self, "Command %r failed with returncode %d, output:\n%s" % (command, returncode, outerr))
+        self.command = command
         self.returncode = returncode
         self.outerr = outerr
 
-    def str(self):
-        return "RsyncError(%r)\nreturncode: %s\nouterr: %s" % (msg, returncode, outerr)
 
+def compose_message(subject, text, recipients):
+    if not isinstance(recipients, str):
+        recipients = ', '.join(recipients)
 
-
-def send_message(subject, text, recipients):
-    if isinstance(recipients, str):
-        recipients = [recipients]
     message = MIMEText(text)
-    from_addr = 'Offsite backup script <%s@%s>' % (os.getlogin(), socket.getfqdn())
     message['Subject'] = subject
-    message['From'] = from_addr
-    message['To'] = ', '.join(recipients)
-    smtp = smtplib.SMTP('localhost')
-    smtp.sendmail(from_addr, recipients, message.as_string())
-    smtp.quit()
+    message['From'] = 'Offsite backup script <%s@%s>' % (os.getlogin(), socket.getfqdn())
+    message['To'] = recipients
+
+    return message
+
+
+def send_message_smtp(message):
+    import smtplib
+    try:
+        smtp = smtplib.SMTP('localhost')
+        smtp.sendmail(message['From'], message['To'].split(', '), message.as_string())
+        smtp.quit()
+        return
+    except smtplib.SMTPException, e:
+        return str(e)
+
+
+def send_message_sendmail(message):
+    try:
+        proc = Popen(['/usr/sbin/sendmail', '-oi', '-t'], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+        outerr = proc.communicate(message.as_string())[0]
+        ret = proc.returncode
+        if ret != 0:
+            return "exit %d from sendmail\noutput:\n%s" % (ret, outerr)
+        return
+    except OSError, e:
+        return str(e)
+
+
+def send_message(message):
+    fail_reason = None
+    if MAIL_DELIVERY_METHOD == 'smtp':
+        fail_reason = send_message_smtp(message)
+    elif MAIL_DELIVERY_METHOD == 'sendmail':
+        fail_reason = send_message_sendmail(message)
+    else:
+        fail_reason = "Invalid MAIL_DELIVERY_METHOD %s" % MAIL_DELIVERY_METHOD
+
+    if fail_reason is not None:
+        print "Unable to send email message: %s" % fail_reason
+        print "Message text:\n%s" % text
+
+
+def notify_email(subject, text):
+    send_message(compose_message(subject, text, NOTIFY_EMAILS))
 
 
 def sbacktick(*args, **kwargs):
     # simplified version of utils.sbacktick from osgbuild
     sp_kwargs = kwargs.copy()
-    sp_kwargs['stdout'] = subprocess.PIPE
-    sp_kwargs['stderr'] = subprocess.STDOUT
+    sp_kwargs['stdout'] = PIPE
+    sp_kwargs['stderr'] = STDOUT
 
     if DRYRUN:
         print str(args)
         return 0, ''
 
-    proc = subprocess.Popen(*args, **sp_kwargs)
+    proc = Popen(*args, **sp_kwargs)
     outerr = proc.communicate()[0]
 
     return proc.returncode, outerr
+
+
+def csbacktick(*args, **kwargs):
+    # checked version of sbacktick
+    ret, outerr = sbacktick(*args, **kwargs)
+    if ret != 0:
+        raise CommandError(command=args[0], returncode=ret, outerr=outerr)
+    return outerr
 
 
 def remote_run_command(commandstr):
@@ -91,21 +134,13 @@ def remote_run_script(script):
         print "---\n%s\n---" % script
         return 0, ''
 
-    proc = subprocess.Popen(['ssh', '-i', KEY, REMOTE_LOGIN_HOST, '/bin/bash -s'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    proc = Popen(['ssh', '-i', KEY, REMOTE_LOGIN_HOST, '/bin/bash -s'], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
     outerr = proc.communicate(script)[0]
 
     return proc.returncode, outerr
 
 
-def rsync(src_path, dest_path, rsync_opts=None):
-    rsync_command = ['rsync']
-    if rsync_opts:
-        rsync_command += rsync_opts
-    rsync_command += [src_path, dest_path]
-    return sbacktick(rsync_command)
-
-
-def checked_rsync_with_retry(src_path, remote_path, link=None):
+def rsync_with_retry(src_path, remote_path, link=None):
     rsync_opts = ['--recursive', '--compress', '--quiet', '--rsh=ssh -i %(KEY)s' % globals()]
 
     if link:
@@ -114,25 +149,14 @@ def checked_rsync_with_retry(src_path, remote_path, link=None):
     dest_path = "%s:%s" % (REMOTE_LOGIN_HOST, remote_path)
     count = 0
     while True:
-        ret, outerr = rsync(src_path + '/', dest_path, rsync_opts)
-        if ret == 0:
+        try:
+            csbacktick(['rsync'] + rsync_opts + [src_path + '/', dest_path])
             return
-        if count >= RETRIES:
-            raise RsyncError("Hit max retries while rsyncing %(src_path)s to %(dest_path)s; giving up" % locals(), ret, outerr)
-        else:
+        except CommandError, e:
+            if count >= RETRIES:
+                raise
             count += 1
             time.sleep(RETRY_WAIT)
-
-
-def checked_compress(tarball, directory):
-    ret, outerr = sbacktick(['tar', '-czpf', tarball, directory])
-
-    if ret != 0:
-        raise CompressError("Error compressing %(directory)s to %(tarball)s:\n%(outerr)s" % locals())
-
-
-def dedupe_is_present():
-    return remote_run_command('[[ -x %s ]]' % DEDUPE_SCRIPT)[0] == 0
 
 
 def dedupe(pattern, substitution, from_dirs, logfile=None):
@@ -156,8 +180,8 @@ def backup_configs_roothome_and_database(workdir, remote_path):
          ('pgsql.tar.gz'        , os.path.join(DBHOST   , 'rootfs/var/lib/pgsql')),
          ('pgsql-backup.tar.gz' , os.path.join(DBHOST   , 'rootfs/var/lib/pgsql-backup'))]:
 
-        checked_compress(os.path.join(workdir, tarball), directory)
-    checked_rsync_with_retry(workdir, remote_path)
+        csbacktick(['tar', '-czpf', os.path.join(workdir, tarball), directory])
+    rsync_with_retry(workdir, remote_path)
 
 
 def backup_packages_with_dedupe(remote_path, remote_link_path, dedupe_pattern, dedupe_substitution, dedupe_logfile):
@@ -172,53 +196,52 @@ def backup_packages_with_dedupe(remote_path, remote_link_path, dedupe_pattern, d
         remote_package_dir = os.path.join(remote_path, 'packages', package)
         remote_link_dir = os.path.join(remote_link_path, 'packages', package)
 
-        checked_rsync_with_retry(package_dir, remote_package_dir, link=remote_link_dir)
+        rsync_with_retry(package_dir, remote_package_dir, link=remote_link_dir)
 
         dedupe(pattern=dedupe_pattern, substitution=dedupe_substitution, from_dirs=[remote_package_dir], logfile=dedupe_logfile)
 
 
 def main(argv):
-    if not dedupe_is_present():
-        print 'dedupe script missing from remote side'
-        return 3
-
-    backup_date = time.strftime("%Y-%m-%d", time.localtime(time.time() - BACKUP_TIME_OFFSET))
-    last_backup_date = time.strftime("%Y-%m-%d", time.localtime(time.time() - LAST_BACKUP_TIME_OFFSET))
-
-    tempdir = tempfile.mkdtemp(prefix='osg-koji-backup')
     try:
+        if remote_run_command('[[ -x %s ]]' % DEDUPE_SCRIPT)[0] != 0:
+            raise Error('dedupe script missing from remote side')
 
-        workdir = os.path.join(tempdir, backup_date)
-        yesterdays_backups = os.path.join(LOCAL_BACKUP_ROOT, backup_date)
-        remote_path = os.path.join(REMOTE_BASE_PATH, backup_date)
-        remote_link_path = os.path.join(REMOTE_BASE_PATH, last_backup_date)
+        backup_date = time.strftime("%Y-%m-%d", time.localtime(time.time() - BACKUP_TIME_OFFSET))
+        last_backup_date = time.strftime("%Y-%m-%d", time.localtime(time.time() - LAST_BACKUP_TIME_OFFSET))
 
-        os.makedirs(workdir)
-
-        olddir = os.getcwd()
+        tempdir = tempfile.mkdtemp(prefix='osg-koji-backup')
         try:
 
+            workdir = os.path.join(tempdir, backup_date)
+            yesterdays_backups = os.path.join(LOCAL_BACKUP_ROOT, backup_date)
+            remote_path = os.path.join(REMOTE_BASE_PATH, backup_date)
+            remote_link_path = os.path.join(REMOTE_BASE_PATH, last_backup_date)
+
+            os.makedirs(workdir)
+
+            olddir = os.getcwd()
             os.chdir(yesterdays_backups)
 
-            try:
-                backup_configs_roothome_and_database(workdir, remote_path)
+            backup_configs_roothome_and_database(workdir, remote_path)
 
-                logfile = os.path.join(REMOTE_BASE_PATH, 'dedupe-%s.log' % backup_date)
-                remote_run_command('rm -f  %s' % re.escape(logfile))
-                backup_packages_with_dedupe(remote_path, remote_link_path, backup_date, last_backup_date, logfile)
-            except Error, e:
-                print str(e)
-                #send_message('Offsite backups failed', str(e), NOTIFY_EMAILS)
-                return 1
+            logfile = os.path.join(REMOTE_BASE_PATH, 'dedupe-%s.log' % backup_date)
+            remote_run_command('rm -f  %s' % re.escape(logfile))
+            backup_packages_with_dedupe(remote_path, remote_link_path, backup_date, last_backup_date, logfile)
 
-        finally:
             os.chdir(olddir)
 
-    finally:
-        shutil.rmtree(tempdir)
+        finally:
+            shutil.rmtree(tempdir)
 
-    #send_message('Offsite backups succeeded', 'Offsite backups succeeded', NOTIFY_EMAILS)
+    except Error, e:
+        notify_email('OSG Koji offsite backups failed', str(e))
+        return str(e)
 
+    except Exception, e:
+        notify_email('OSG Koji offsite backups died', str(e))
+        raise
+
+    notify_email('OSG Koji offsite backups succeeded (nt)', '')
     return 0
 
 
