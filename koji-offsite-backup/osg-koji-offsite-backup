@@ -12,8 +12,8 @@ KOJIHOST                = 'koji-hub.batlab.org'
 DBHOST                  = 'db-01.batlab.org'
 RETRIES                 = 10
 RETRY_WAIT              = 60
-# TODO change this
-NOTIFY_EMAILS           = ['matyas@cs.wisc.edu']
+#NOTIFY_EMAILS           = [x + '@cs.wisc.edu' for x in ['blin', 'cat', 'edquist', 'matyas', 'tim']]
+NOTIFY_EMAILS           = [x + '@cs.wisc.edu' for x in ['matyas']]
 KEY                     = '/root/osg_backup_key'
 BACKUP_TIME_OFFSET      = 86400     # 1 day
 LAST_BACKUP_TIME_OFFSET = 86400 * 8 # 1 week + 1 day
@@ -201,6 +201,25 @@ def backup_packages_with_dedupe(remote_path, remote_link_path, dedupe_pattern, d
         dedupe(pattern=dedupe_pattern, substitution=dedupe_substitution, from_dirs=[remote_package_dir], logfile=dedupe_logfile)
 
 
+def get_backup_statistics(remote_path):
+    esc_remote_path = re.escape(remote_path)
+    try:
+        file_count = int(remote_run_command('find %s -type f | wc -l' % esc_remote_path)[1])
+        deduped_count = int(remote_run_command('find %s -type f -links +1 | wc -l' % esc_remote_path)[1])
+        disk_usage = remote_run_command('du -hs %s | awk "{print \\$1}"' % esc_remote_path)[1].strip()
+        disk_free = remote_run_command('df -h %s' % esc_remote_path)[1].strip()
+        return '''\
+Files backed up:    %(file_count)7d
+Files deduplicated: %(deduped_count)7d
+Disk usage:         %(disk_usage)7s
+Disk free:
+%(disk_free)s
+''' % locals()
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+
 def main(argv):
     try:
         if remote_run_command('[[ -x %s ]]' % DEDUPE_SCRIPT)[0] != 0:
@@ -241,8 +260,17 @@ def main(argv):
         notify_email('OSG Koji offsite backups died', str(e))
         raise
 
-    notify_email('OSG Koji offsite backups succeeded (nt)', '')
-    return 0
+    else:
+        message = 'OSG Koji offsite backups to %s succeeded\n' % remote_path
+        statistics = get_backup_statistics(remote_path)
+
+        if statistics is not None:
+            message += statistics
+        else:
+            message += 'Unable to get backup statistics\n'
+
+        notify_email('OSG Koji offsite backups completed', message)
+        return 0
 
 
 if __name__ == "__main__":
