@@ -1,0 +1,196 @@
+#!/bin/bash
+
+# Size (in bytes) below which we want to do an exact comparison instead of
+# just checking file size
+SIZE_THRESHOLD=$(( 512 * 1024 ))
+
+set -o nounset
+
+complain() {
+    printf "%s\n" "$*" >&2
+}
+
+die() {
+    complain "$@"
+    exit 1
+}
+
+usage() {
+    [[ -n ${1-} ]] && printf "%s\n" "$1"
+    cat <<END
+Usage: $0 <pattern> <substitution> [<from-dir>...]
+
+Deduplicate backups in each \`from-dir' by hardlinking to files at the path
+obtained by replacing \`pattern' with \`substitution' in the path of each file
+under each \`from-dir'.  \`pattern' is a shell glob.
+
+Each \`from-dir' must be a directory.  Each directory obtained by replacing
+\`pattern' with \`substitution' in each \`from-dir' must exist.
+
+Files with sizes less than $SIZE_THRESHOLD bytes are compared byte-by-byte.
+For larger files, only the file size needs to match.
+END
+    exit 2
+}
+
+
+getsize() {
+    stat --format='%s' "$1"
+}
+
+compare_size() {
+    [[ $(getsize "$1") == $(getsize "$2") ]]
+}
+
+compare_cmp() {
+    cmp --silent "$1" "$2"
+}
+
+getinode() {
+    stat --format='%i' "$1"
+}
+
+compare_inode() {
+    [[ $(getinode "$1") == $(getinode "$2") ]]
+}
+
+print_statistics() {
+    local already_linked=$1; shift
+    local contents_mismatch=$1; shift
+    local dedupe_count=$1; shift
+    local link_failed=$1; shift
+    local missing_dest=$1; shift
+    local size_mismatch=$1; shift
+
+    printf "%10d file(s) skipped because their dest files were missing\n" $missing_dest
+    printf "%10d file(s) skipped because they were already linked\n" $already_linked
+    printf "%10d file(s) skipped because their sizes didn't match\n" $size_mismatch
+    printf "%10d file(s) skipped because their contents didn't match\n" $contents_mismatch
+    printf "%10d file(s) skipped because linking failed\n" $link_failed
+    printf "%10d file(s) successfully replaced with hardlinks\n" $dedupe_count
+}
+
+[[ $# -lt 2 ]] && usage
+pattern=$1
+substitution=$2
+
+if [[ $pattern = $substitution ]]; then
+    usage "\`pattern' must be different than \`substitution'"
+fi
+
+shift 2
+if [[ $# -eq 0 ]]; then
+    set -- "$pattern"
+fi
+
+
+
+total_already_linked=0
+total_contents_mismatch=0
+total_dedupe_count=0
+total_dirs_skipped=0
+total_link_failed=0
+total_missing_dest=0
+total_size_mismatch=0
+
+for fromdir; do
+
+    if [[ ! -d $fromdir ]]; then
+        complain "Skipping $fromdir: no such directory"
+        ((total_dirs_skipped++))
+        continue
+    fi
+
+    todir=${fromdir/"$pattern"/"$substitution"}
+    if [[ $todir = $fromdir ]]; then
+        complain "Skipping $fromdir: substitution failed"
+        ((total_dirs_skipped++))
+        continue
+    fi
+
+    if [[ ! -d $todir ]]; then
+        complain "Skipping $fromdir: $todir does not exist or is not a directory"
+        ((total_dirs_skipped++))
+        continue
+    fi
+
+    already_linked=0
+    contents_mismatch=0
+    dedupe_count=0
+    link_failed=0
+    missing_dest=0
+    size_mismatch=0
+
+    # safe find recipe from
+    # http://www.dwheeler.com/essays/filenames-in-shell.html
+    while IFS="" read -r -d "" fromfile; do
+
+        tofile=${fromfile/"$pattern"/"$substitution"}
+        if [[ ! -f $tofile ]]; then
+            ((missing_dest++))
+            continue
+        fi
+
+        if compare_inode "$tofile" "$fromfile"; then
+            ((already_linked++))
+            continue
+        fi
+
+        if ! compare_size "$tofile" "$fromfile"; then
+            ((size_mismatch++))
+            continue
+        fi
+        if [[ $(getsize "$tofile") -lt $SIZE_THRESHOLD ]]; then
+            if ! compare_cmp "$tofile" "$fromfile"; then
+                ((contents_mismatch++))
+                continue
+            fi
+        fi
+
+        if ln --no-dereference --force "$tofile" "$fromfile"; then
+            ((dedupe_count++))
+        else
+            ((link_failed++))
+        fi
+
+    done < <(find "$fromdir" -xdev -xautofs -type f -print0)
+
+    echo
+    echo "Statistics for $fromdir:"
+    print_statistics \
+        $already_linked \
+        $contents_mismatch \
+        $dedupe_count \
+        $link_failed \
+        $missing_dest \
+        $size_mismatch
+    echo
+
+    ((total_already_linked+=already_linked))
+    ((total_contents_mismatch+=contents_mismatch))
+    ((total_dedupe_count+=dedupe_count))
+    ((total_link_failed+=link_failed))
+    ((total_missing_dest+=missing_dest))
+    ((total_size_mismatch+=size_mismatch))
+
+done
+
+if [[ $# -gt 1 ]]; then
+    echo
+    echo "------------------"
+    echo "Overall statistics"
+    echo "------------------"
+    print_statistics \
+        $total_already_linked \
+        $total_contents_mismatch \
+        $total_dedupe_count \
+        $total_link_failed \
+        $total_missing_dest \
+        $total_size_mismatch
+    echo
+    if [[ $total_dirs_skipped -ne 0 ]]; then
+        echo "*** $total_dirs_skipped directories were skipped ***"
+    fi
+fi
+
+# vim:sw=4:sts=4:et
