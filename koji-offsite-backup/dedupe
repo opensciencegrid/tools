@@ -62,12 +62,12 @@ print_statistics() {
     local missing_dest=$1; shift
     local size_mismatch=$1; shift
 
-    printf "%10d file(s) skipped because their dest files were missing\n" $missing_dest
-    printf "%10d file(s) skipped because they were already linked\n" $already_linked
-    printf "%10d file(s) skipped because their sizes didn't match\n" $size_mismatch
-    printf "%10d file(s) skipped because their contents didn't match\n" $contents_mismatch
-    printf "%10d file(s) skipped because linking failed\n" $link_failed
-    printf "%10d file(s) successfully replaced with hardlinks\n" $dedupe_count
+    ((missing_dest == 0))      || printf "%10d file(s) skipped because their dest files were missing\n" $missing_dest
+    ((already_linked == 0))    || printf "%10d file(s) skipped because they were already linked\n"      $already_linked
+    ((size_mismatch == 0))     || printf "%10d file(s) skipped because their sizes didn't match\n"      $size_mismatch
+    ((contents_mismatch == 0)) || printf "%10d file(s) skipped because their contents didn't match\n"   $contents_mismatch
+    ((link_failed == 0))       || printf "%10d file(s) skipped because linking failed\n"                $link_failed
+    ((dedupe_count == 0))      || printf "%10d file(s) successfully replaced with hardlinks\n"          $dedupe_count
 }
 
 [[ $# -lt 2 ]] && usage
