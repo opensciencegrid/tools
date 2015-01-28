@@ -60,6 +60,8 @@ def nvrgen(items):
             na = arch_strip(na)
         if strip_dist:
             evr = dist_strip(evr)
+        if evr.startswith("0:"):
+            evr = evr[2:]
         yield [na,evr]
         items[:2] = []
 
