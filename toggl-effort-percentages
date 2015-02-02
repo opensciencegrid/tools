@@ -1,0 +1,71 @@
+#!/usr/bin/python
+
+import csv
+import math
+import operator
+import os
+import sys
+
+def print_usage_and_die():
+    print 'usage: %s TOGGL-CSV-PATH' % (os.path.basename(__file__))
+    sys.exit(1)
+
+if len(sys.argv) != 2:
+    print_usage_and_die()
+csv_filename = sys.argv[1]
+try:
+    csv_file = open(csv_filename, 'r')
+except IOError as e:
+    print 'Could not open input file: %s' % (e.strerror)
+    print_usage_and_die()
+
+times = {}
+total_duration = 0
+
+toggl_reader = csv.reader(csv_file)
+for row in toggl_reader:
+    if row[2] == 'Registered time':
+        continue
+    (client, project, hhmmss) = row[0:3]
+
+    duration_parts = hhmmss.split(':')
+    duration = (int(duration_parts[0]) * 3600) + (int(duration_parts[1]) * 60) + int(duration_parts[2])
+
+    # "bucket" is the key for the "times" dictionary
+    # Change this code if you want to use more than just the Toggl project name.
+    bucket = project
+
+    total_duration += duration
+    if bucket in times:
+        times[bucket] += duration
+    else:
+        times[bucket] = duration
+
+sum_of_floors = 0
+values = []
+for bucket in times:
+    duration = times[bucket]
+    percent = 100.0 * duration / total_duration
+    residual, floor_percent = math.modf(percent)
+    sum_of_floors += int(floor_percent)
+    # print '%6.2f   %3.0f   %4.2f   %6d   %s' % (percent, floor_percent, residual, duration, bucket)
+    values.append([residual, duration, percent, floor_percent, bucket])
+points_to_distribute = 100 - sum_of_floors
+
+points_used = 0
+for data in sorted(values, key=operator.itemgetter(0, 1), reverse=True):
+    percentage = int(data[3])
+    if points_used < points_to_distribute:
+        percentage += 1
+        points_used += 1
+    data.append(percentage)
+    (residual, duration, raw_percent, floor_percent, category, int_percent) = data
+    print '%6d  %6.2f  %3.0f  %4.2f  %3.0f  %s' % (duration, raw_percent, floor_percent, residual, int_percent, category)
+print
+print 'Sum of floors is %d with %d left over' % (sum_of_floors, points_to_distribute)
+print
+
+print 'EFFORT'
+for data in sorted(values, key=operator.itemgetter(5, 1), reverse=True):
+    (residual, duration, raw_percent, floor_percent, category, int_percent) = data
+    print '* %2d%% %s' % (int_percent, category)
