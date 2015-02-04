@@ -1,0 +1,48 @@
+#!/bin/bash
+
+usage () {
+  echo "usage: $(basename "$0") [-v]"
+  echo "shows packages in both epelrescue and epel, for EL{5,6,7}"
+  echo "use -v to show packages in epelrescue but not epel"
+  exit
+}
+
+grepops=
+sym='&'
+
+while [[ $1 ]]; do
+case $1 in
+  -v ) grepops=-v; sym='%'; shift ;;
+   * ) usage ;;
+esac
+done
+
+recurse_if_el7 () {
+  case $EL in
+    7 ) perl -lne 'print $1 if m{<a href="(\w/)">}' \
+        | wget -qO- -B "$baseurl" -i- ;;
+    * ) cat ;;
+  esac
+}
+
+list_epel () {
+  wget -qO- "$baseurl" | recurse_if_el7 \
+  | perl -lne 'print $1 if /<a href="([^"]+)(-[^-"]+){2}"/'
+}
+
+list_epelrescue () {
+  osg-koji list-tagged --quiet --latest epelrescue-el$EL \
+  | awk '{print $1}' | perl -lpe 's/(-[^-]+){2}$//'
+}
+
+print_intersection () {
+  fgrep $grepops -xf <(list_epel) <(list_epelrescue) || echo "(none)"
+}
+
+for EL in 5 6 7; do
+  baseurl=http://dl.fedoraproject.org/pub/epel/$EL/SRPMS/
+  echo "checking for packages in epelrescue$EL $sym epel$EL..."
+  print_intersection | sort
+  echo
+done
+
