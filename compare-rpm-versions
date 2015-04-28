@@ -12,7 +12,8 @@ The outputs can also be a root.log from a koji/mock build.
 Options:
   -A, --no-strip-arch  don't attempt to strip .arch from package names
   -D, --no-strip-dist  don't attempt to strip .dist tag from package releases
-  --show-all           show versions for all packages
+      --show-all       show versions for all packages
+  -m, --show-missing   show versions for packages not in both sets
   --[no-]color         colorize version differences (default = True if tty)
 """
 
@@ -24,6 +25,7 @@ import re
 
 use_color  = sys.stdout.isatty()
 show_all   = False
+show_miss  = False
 dirs       = []
 strip_arch = True
 strip_dist = True
@@ -39,6 +41,7 @@ for arg in sys.argv[1:]:
     if   arg == '--color'                 : use_color  = True
     elif arg == '--no-color'              : use_color  = False
     elif arg in ('--show-all','--all')    : show_all   = True
+    elif arg in ('-m', '--show-missing')  : show_miss  = True
     elif arg in ('-A', '--no-strip-arch') : strip_arch = False
     elif arg in ('-D', '--no-strip-dist') : strip_dist = False
     elif arg.startswith('-')              : usage()
@@ -125,7 +128,7 @@ def colorize_vr(vr1, vr2):
     return map('-'.join, [[v1,r1],[v2,r2]])
 
 pkg_diffs = []
-for pkg in sorted(all_rpms if show_all else all_match_rpms):
+for pkg in sorted(all_rpms if show_all or show_miss else all_match_rpms):
     vr1 = rpms1.get(pkg) or '-'
     vr2 = rpms2.get(pkg) or '-'
     if show_all or vr1 != vr2:
