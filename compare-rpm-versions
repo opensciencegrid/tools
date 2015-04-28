@@ -7,6 +7,8 @@ Usage:
 Compare and print any version differences between RPMs installed in both of
 two osg-test run directories, as found in output-NNN/output/osg-test-*.log
 
+The outputs can also be a root.log from a koji/mock build.
+
 Options:
   -A, --no-strip-arch  don't attempt to strip .arch from package names
   -D, --no-strip-dist  don't attempt to strip .dist tag from package releases
@@ -15,6 +17,7 @@ Options:
 """
 
 import glob
+import stat
 import sys
 import os
 import re
@@ -65,16 +68,28 @@ def nvrgen(items):
         yield [na,evr]
         items[:2] = []
 
-def nvrmap(outdir):
-    globpat = "%s/output/osg-test-*.log" % outdir
-    log = glob.glob(globpat)
-    if len(log) != 1:
-        print >>sys.stderr, "Error: could not find '%s'" % globpat
-        sys.exit(1)
+def isfile(fn):
+    try:
+        return stat.S_ISREG(os.stat(fn).st_mode)
+    except OSError:
+        return False
+
+def nvrmap(output):
+    if isfile(output):
+        log = output
+    else:
+        globpat = "%s/output/osg-test-*.log" % output
+        log = glob.glob(globpat)
+        if len(log) != 1:
+            print >>sys.stderr, "Error: could not find '%s'" % globpat
+            sys.exit(1)
+        log = log[0]
 
     # split this way since there can be more than one item per line
-    txt = open(log[0]).read()
-    items_pat = r'^(?:Dependency )?Installed:\n(.*?)\n\n'
+    txt = open(log).read()
+    # strip "DEBUG util.py:388:  " in case this is coming from a root.log
+    txt = re.sub(r'\n[A-Z]+ .*?:\d+:  ', r'\n', txt)
+    items_pat = r'^(?:Dependency )?Installed:\n(.*?)\n(?:\n|(?=[^ ]))'
     items = ' '.join(re.findall(items_pat, txt, re.S | re.M)).split()
     return dict(nvrgen(items))
 
