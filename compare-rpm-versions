@@ -92,7 +92,10 @@ def nvrmap(output):
     txt = open(log).read()
     # strip "DEBUG util.py:388:  " in case this is coming from a root.log
     txt = re.sub(r'\n[A-Z]+ .*?:\d+:  ', r'\n', txt)
-    items_pat = r'^(?:Dependency )?Installed:\n(.*?)\n(?:\n|(?=[^ ]))'
+    # don't include Install list from cleanup/downgrade
+    txt = re.sub(r'\nosgtest: .* special_cleanup[\d\D]*', r'\n', txt)
+    items_pat = (r'^(?:Dependency )?(?:Installed|Updated|Replaced):\n'
+                 r'(.*?)\n(?:\n|(?=[^ ]))')
     items = ' '.join(re.findall(items_pat, txt, re.S | re.M)).split()
     return dict(nvrgen(items))
 
