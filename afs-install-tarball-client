@@ -9,6 +9,7 @@ INSTALL_ROOT=/p/condor/workspaces/vdt/tarball-client
 CA_CERTIFICATES_DIR=/p/condor/workspaces/vdt/osg-ca-certs
 
 Version=
+MajorVersion=
 Release=
 VR=
 
@@ -26,8 +27,8 @@ main () {
     # @sys AFS magic to point to the dir that's appropriate for the system
     ln -s '@sys' $VR/sys
 
-    install_client_tarball i386_rhel5 el5.i386
-    install_client_tarball amd64_rhel6 el6.x86_64
+    install_client_tarball i386_rhel5 el5 i386
+    install_client_tarball amd64_rhel6 el6 x86_64
 
     newline
     newline
@@ -55,6 +56,7 @@ get_args () {
     fi
 
     Version=$1
+    MajorVersion=${Version%.*}
     if test -z "$2"; then
         message "Release not specified. Assuming '1' for the release."
         Release=1
@@ -66,13 +68,15 @@ get_args () {
 
 install_client_tarball () {
     local sysname
-    local dver_arch
+    local dver
+    local arch
     sysname=$1
-    dver_arch=$2
+    dver=$2
+    arch=$3
     local OLDPWD
 
     newline
-    extract $TARBALLS_DIR/$METAPACKAGE-$VR.$dver_arch.tar.gz $VR/$sysname
+    extract $TARBALLS_DIR/$MajorVersion/$arch/$METAPACKAGE-$VR.$dver.$arch.tar.gz $VR/$sysname
     message "Running post-install for $sysname"
     OLDPWD=$PWD
     cd $VR/$sysname
