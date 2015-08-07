@@ -7,7 +7,7 @@ import smtplib
 import time
 import urllib2
 
-RECIPIENTS = ('Tim Cartwright <cat@cs.wisc.edu>',)
+RECIPIENTS = ('Tim Cartwright <cat@cs.wisc.edu>', 'Brian Lin <blin@cs.wisc.edu>')
 HEADERS = ('Open', 'In Progress', 'Ready for Testing', 'Ready for Release')
 URL = 'https://jira.opensciencegrid.org/browse/SOFTWARE/?selectedTab=com.atlassian.jira.jira-projects-plugin:issues-panel'
 
@@ -30,6 +30,8 @@ for h in HEADERS:
     m = re.search(r'>%s<.*?<td class="cell-type-collapsed">(\d+)</td>' % h, html, re.S)
     if m:
         text += '    * %s: %s ()\n' % (h, m.groups()[0])
+    else:
+        text += '    * %s: 0 ()\n' % (h)
 text += '\n'
 text += 'Completed at %s\n' % (time.strftime('%Y-%m-%d %H:%M'))
 
