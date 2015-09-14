@@ -4,7 +4,9 @@ use POSIX 'strftime';
 
 my $list = 1 if @ARGV && $ARGV[0] eq '-l';
 
-$_ = `wget -qO- http://ticket.grid.iu.edu/list/open`;
+my $baseurl = "https://ticket.grid.iu.edu";
+
+$_ = `wget -qO- $baseurl/list/open`;
 
 s/&nbsp;/ /g;
 
@@ -39,11 +41,11 @@ my $n_old = @old;
 
 print "$n_software open Software Support ticket(s)\n";
 if ($list) {
-  print " - http://ticket.grid.iu.edu/$_\n" for @software;
+  print " - $baseurl/$_\n" for @software;
   print "\n";
 }
 print "$n_old Software Support ticket(s) open for over 30 days\n";
 if ($list) {
-  print " - http://ticket.grid.iu.edu/$_\n" for @old;
+  print " - $baseurl/$_\n" for @old;
 }
 
