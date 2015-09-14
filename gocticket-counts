@@ -1,0 +1,36 @@
+#!/usr/bin/perl -w
+use strict;
+use POSIX 'strftime';
+
+$_ = `wget -qO- http://ticket.grid.iu.edu/list/open`;
+
+s/&nbsp;/ /g;
+
+m{<thead>(.*?)</thead>}s;
+my $hdr = $1;
+$hdr =~ s{<input.*?/>}{}g;
+my @hdrs = $hdr =~ m{<th>(.*?)</th>}g;
+s/ /_/g for @hdrs;
+my %hdridx = map {$hdrs[$_] => $_} 0 .. $#hdrs;
+
+my $submit = $hdridx{Submit_Date};
+my $owner = $hdridx{Assignees};
+my $id = $hdridx{ID};
+
+my $olddate = strftime "%F", localtime(time - 60*60*24*30);
+
+my $n_software;
+my $n_old;
+
+while (m{<tr onclick="window.name = 'gocticket_list'(.*?)</tr>}gs) {
+  my $tr = $1;
+  my @tds = $tr =~ m{<td>(.*?)</td>}gs;
+  if ($tds[$owner] =~ /Software Support/) {
+    ++$n_software;
+    ++$n_old if $tds[$submit] lt $olddate;
+  }
+}
+
+print "$n_software open Software Support ticket(s)\n";
+print "$n_old Software Support ticket(s) open for over 30 days\n";
+
