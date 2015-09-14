@@ -2,6 +2,8 @@
 use strict;
 use POSIX 'strftime';
 
+my $list = 1 if @ARGV && $ARGV[0] eq '-l';
+
 $_ = `wget -qO- http://ticket.grid.iu.edu/list/open`;
 
 s/&nbsp;/ /g;
@@ -15,22 +17,33 @@ my %hdridx = map {$hdrs[$_] => $_} 0 .. $#hdrs;
 
 my $submit = $hdridx{Submit_Date};
 my $owner = $hdridx{Assignees};
+my $title = $hdridx{Title};
 my $id = $hdridx{ID};
 
 my $olddate = strftime "%F", localtime(time - 60*60*24*30);
 
-my $n_software;
-my $n_old;
+my @software;
+my @old;
 
 while (m{<tr onclick="window.name = 'gocticket_list'(.*?)</tr>}gs) {
   my $tr = $1;
   my @tds = $tr =~ m{<td>(.*?)</td>}gs;
   if ($tds[$owner] =~ /Software Support/) {
-    ++$n_software;
-    ++$n_old if $tds[$submit] lt $olddate;
+    push @software, "$tds[$id]: $tds[$title]";
+    push @old, "$tds[$id]: $tds[$title]" if $tds[$submit] lt $olddate;
   }
 }
 
+my $n_software = @software;
+my $n_old = @old;
+
 print "$n_software open Software Support ticket(s)\n";
+if ($list) {
+  print " - http://ticket.grid.iu.edu/$_\n" for @software;
+  print "\n";
+}
 print "$n_old Software Support ticket(s) open for over 30 days\n";
+if ($list) {
+  print " - http://ticket.grid.iu.edu/$_\n" for @old;
+}
 
