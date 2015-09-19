@@ -1,51 +1,45 @@
-#!/usr/bin/perl -w
-use strict;
-use POSIX 'strftime';
+#!/usr/bin/python
 
-my $list = 1 if @ARGV && $ARGV[0] eq '-l';
+# brief summary of open GOC tickets + list of ones open > 30 days
 
-my $baseurl = "https://ticket.grid.iu.edu";
+import urllib2
+import time
+import re
 
-$_ = `wget -qO- $baseurl/list/open`;
+baseurl = 'https://ticket.grid.iu.edu'
+listurl = baseurl + '/list/open'
 
-s/&nbsp;/ /g;
+html = urllib2.urlopen(listurl).read()
+html = html.replace('&nbsp;', ' ')
+m = re.search(r'<thead>(.*?)</thead>', html, re.S)
+hdr = m.group(1)
+hdr = re.sub(r'<input.*?/>', '', hdr)
+hdrs = re.findall(r'<th>(.*?)</th>', hdr.replace(' ', '_'))
+hdridx = dict((h,i) for (i,h) in enumerate(hdrs))
 
-m{<thead>(.*?)</thead>}s;
-my $hdr = $1;
-$hdr =~ s{<input.*?/>}{}g;
-my @hdrs = $hdr =~ m{<th>(.*?)</th>}g;
-s/ /_/g for @hdrs;
-my %hdridx = map {$hdrs[$_] => $_} 0 .. $#hdrs;
+submit = hdridx["Submit_Date"]
+owner = hdridx["Assignees"]
+title = hdridx["Title"]
+ID = hdridx["ID"]
 
-my $submit = $hdridx{Submit_Date};
-my $owner = $hdridx{Assignees};
-my $title = $hdridx{Title};
-my $id = $hdridx{ID};
+olddate = time.strftime("%F", time.localtime(time.time() - 60*60*24*30))
 
-my $olddate = strftime "%F", localtime(time - 60*60*24*30);
+software = []
+old = []
 
-my @software;
-my @old;
+ticket_re = r'''<tr onclick="window.name = 'gocticket_list'(.*?)</tr>'''
+ticket_trs = re.findall(ticket_re, html, re.S)
 
-while (m{<tr onclick="window.name = 'gocticket_list'(.*?)</tr>}gs) {
-  my $tr = $1;
-  my @tds = $tr =~ m{<td>(.*?)</td>}gs;
-  if ($tds[$owner] =~ /Software Support/) {
-    push @software, "$tds[$id]: $tds[$title]";
-    push @old, "$tds[$id]: $tds[$title]" if $tds[$submit] lt $olddate;
-  }
-}
+for tr in ticket_trs:
+    tds = re.findall(r'<td>(.*?)</td>', tr, re.S)
+    if re.search(r'Software Support', tds[owner]):
+        software.append(tds)
+        if tds[submit] < olddate:
+            old.append(tds)
 
-my $n_software = @software;
-my $n_old = @old;
-
-print "$n_software open Software Support ticket(s)\n";
-if ($list) {
-  print " - $baseurl/$_\n" for @software;
-  print "\n";
-}
-print "$n_old Software Support ticket(s) open for over 30 days\n";
-if ($list) {
-  print " - $baseurl/$_\n" for @old;
-}
+print len(software), "open Software Support ticket(s)"
+print
+print len(old), "Software Support ticket(s) open for over 30 days"
+for tds in old:
+    print " - %s [%s/%s] %s" % (tds[submit], baseurl, tds[ID], tds[title])
 
