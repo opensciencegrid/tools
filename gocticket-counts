@@ -2,8 +2,11 @@
 
 # brief summary of open GOC tickets + list of ones open > 30 days
 
+# takes optional Assignee name(s) to list those tickets also
+
 import urllib2
 import time
+import sys
 import re
 
 baseurl = 'https://ticket.grid.iu.edu'
@@ -42,4 +45,14 @@ print
 print len(old), "Software Support ticket(s) open for over 30 days"
 for tds in old:
     print " - %s [%s/%s] %s" % (tds[submit], baseurl, tds[ID], tds[title])
+
+if sys.argv[1:]:
+    pat = '|'.join(sys.argv[1:])
+    trs = [tr for tr in software if re.search(pat, tr[owner])]
+    print
+    print "%d Software Support ticket(s) with Asssignees matching '%s'" % (
+        len(trs), pat)
+    
+    for tds in trs:
+        print " - %s [%s/%s] %s" % (tds[submit], baseurl, tds[ID], tds[title])
 
