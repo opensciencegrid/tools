@@ -4,7 +4,6 @@ set -o nounset
 
 VDTWWW=/p/vdt/public/html
 TARBALLS_DIR=$VDTWWW/tarball-client
-METAPACKAGE=osg-client
 INSTALL_ROOT=/p/condor/workspaces/vdt/tarball-client
 CA_CERTIFICATES_DIR=/p/condor/workspaces/vdt/osg-ca-certs
 
@@ -27,8 +26,13 @@ main () {
     # @sys AFS magic to point to the dir that's appropriate for the system
     ln -s '@sys' $VR/sys
 
-    install_client_tarball i386_rhel5 el5 i386
-    install_client_tarball amd64_rhel6 el6 x86_64
+    if test $MajorVersion = 3.1 || test $MajorVersion = 3.2; then
+        install_tarball osg-client i386_rhel5 el5 i386
+        install_tarball osg-client amd64_rhel6 el6 x86_64
+    else
+        install_tarball osg-afs-client amd64_rhel6 el6 x86_64
+        install_tarball osg-afs-client amd64_rhel7 el7 x86_64
+    fi
 
     newline
     newline
@@ -66,17 +70,16 @@ get_args () {
     VR=${Version}-${Release}
 }
 
-install_client_tarball () {
-    local sysname
-    local dver
-    local arch
-    sysname=$1
-    dver=$2
-    arch=$3
+install_tarball () {
+    local metapackage="$1"; shift
+    local sysname="$1"; shift
+    local dver="$1"; shift
+    local arch="$1"; shift
+
     local OLDPWD
 
     newline
-    extract $TARBALLS_DIR/$MajorVersion/$arch/$METAPACKAGE-$VR.$dver.$arch.tar.gz $VR/$sysname
+    extract $metapackage $TARBALLS_DIR/$MajorVersion/$arch/$metapackage-$VR.$dver.$arch.tar.gz $VR/$sysname
     message "Running post-install for $sysname"
     OLDPWD=$PWD
     cd $VR/$sysname
@@ -102,11 +105,14 @@ die_if_dir_exists () {
 }
 
 extract () {
-    message "Extracting $1 into $2"
+    local metapackage="$1"; shift
+    local tarball="$1"; shift
+    local destdir="$1"; shift
+    message "Extracting $tarball into $destdir"
     # Note: There is a bug in the version of tar on EL5 that prevents
     # --strip-components from working, hence the explicit 'mv' step
-    tar -xzf "$1"
-    mv $METAPACKAGE "$2"
+    tar -xzf "$tarball"
+    mv "$metapackage" "$destdir"
 }
 
 message () {
