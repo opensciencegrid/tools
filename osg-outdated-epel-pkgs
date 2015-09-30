@@ -11,6 +11,7 @@ Options:
   --make-cache     save epelX.html and osg-3.X-elX-XXX.list for offline use
   --cached         used cached files instead of pulling live versions
   --[no-]color     colorize version differences (default = True if tty)
+  --html           generate html output
   --show-all       show versions even for non-outdated packages
 """
 
@@ -33,6 +34,7 @@ use_cached = False
 make_cache = False
 use_color  = sys.stdout.isatty()
 show_all   = False
+html_out   = False
 
 def usage():
     print __doc__ % (os.path.basename(__file__), SERIES, EL, TAG)
@@ -53,6 +55,9 @@ for arg in sys.argv[1:]:
         use_color = True
     elif arg == '--no-color':
         use_color = False
+    elif arg == '--html':
+        html_out = True
+        use_color = True
     elif arg == '--show-all':
         show_all = True
     else:
@@ -132,6 +137,25 @@ def colorize_vr(vr1, vr2):
 
     return map('-'.join, [[v1,r1],[v2,r2]])
 
+def colorize_html(color, *seq):
+    return [ '<span class="%s">%s</span>' % (color, x) for x in seq ]
+
+def colorize_html_vr(vr1, vr2):
+    v1,r1 = vr1.split('-')
+    v2,r2 = vr2.split('-')
+
+    if v1 != v2:
+        v1,v2 = colorize_html('vdiff', v1, v2)
+    elif r1 != r2:
+        r1,r2 = colorize_html('rdiff', r1, r2)
+
+    return map('-'.join, [[v1,r1],[v2,r2]])
+
+if html_out:
+    colorize_vr = colorize_html_vr
+    print ("<html>\n<head>\n<style type='text/css'>\n.vdiff {color:green}\n"
+           ".rdiff {color:blue}\n</style>\n</head>\n<body>\n<pre>")
+
 pkg_diffs = []
 for pkg in sorted(osg_map):
     if pkg in epel_map:
@@ -150,4 +174,7 @@ if pkg_diffs:
         print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
 else:
     print "No package version differences"
+
+if html_out:
+    print "</pre>\n</body>\n</html>"
 
