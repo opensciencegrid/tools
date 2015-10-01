@@ -11,7 +11,8 @@ Options:
   --make-cache     save epelX.html and osg-3.X-elX-XXX.list for offline use
   --cached         used cached files instead of pulling live versions
   --[no-]color     colorize version differences (default = True if tty)
-  --html           generate html output
+  --html           generate html output (implies --color)
+  --preamble=text  print some preamble text before the report
   --show-all       show versions even for non-outdated packages
 """
 
@@ -35,6 +36,7 @@ make_cache = False
 use_color  = sys.stdout.isatty()
 show_all   = False
 html_out   = False
+preamble   = None
 
 def usage():
     print __doc__ % (os.path.basename(__file__), SERIES, EL, TAG)
@@ -58,6 +60,8 @@ for arg in sys.argv[1:]:
     elif arg == '--html':
         html_out = True
         use_color = True
+    elif arg.startswith('--preamble='):
+        preamble = arg[len('--preamble='):]
     elif arg == '--show-all':
         show_all = True
     else:
@@ -155,6 +159,10 @@ if html_out:
     colorize_vr = colorize_html_vr
     print ("<html>\n<head>\n<style type='text/css'>\n.vdiff {color:green}\n"
            ".rdiff {color:blue}\n</style>\n</head>\n<body>\n<pre>")
+
+if preamble:
+    print preamble
+    print
 
 pkg_diffs = []
 for pkg in sorted(osg_map):
