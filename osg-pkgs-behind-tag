@@ -1,0 +1,112 @@
+#!/usr/bin/python
+
+"""
+Usage:
+  {0} [options] tag1 tag2
+
+Shows packages present in both tag1 and tag2, with a newer NVR in tag2.
+
+Examples:
+  {0}  osg-3.3-el6-{{release,testing}}
+  {0}  osg-3.3-el6-{{testing,development}}
+  {0}  osg-{{3.2,3.3}}-el6-release
+
+Options:
+  --[no-]color     colorize version differences (default = True if tty)
+  --show-all       show versions even for non-outdated packages
+"""
+
+import sys
+import os
+import re
+import rpm
+import urllib2
+try:
+    from rpmUtils.miscutils import stringToVersion
+except ImportError:
+    from miscutils import stringToVersion
+
+
+use_color = sys.stdout.isatty()
+show_all  = False
+tags = []
+
+tagpat = r'^osg-([3-9]\.[0-9]|upcoming)-el[5-9]-(development|testing|release)$'
+
+def usage():
+    print __doc__.format(os.path.basename(__file__))
+    sys.exit()
+
+for arg in sys.argv[1:]:
+    if re.search(tagpat, arg):
+        tags.append(arg)
+    elif arg == '--color':
+        use_color = True
+    elif arg == '--no-color':
+        use_color = False
+    elif arg in ('--all', '--show-all'):
+        show_all = True
+    else:
+        usage()
+
+if len(tags) != 2:
+        usage()
+
+def strip_dist_tag(seq, dist_pfx):
+    pat = r'\.%s[^-]*$' % dist_pfx
+    return [ re.sub(pat, '', nvr) for nvr in seq ]
+
+def get_osg_list(osg_tag):
+    cmd = "osg-koji list-tagged --latest --rpms %s" % osg_tag
+
+    handle = os.popen(cmd)
+
+    nvrs = [ line[:-5] for line in handle if line.endswith(".src\n") ]
+    return strip_dist_tag(nvrs, 'osg')
+
+def rpmvercmp(a,b):
+    return rpm.labelCompare(*[stringToVersion(x) for x in (a,b)])
+
+def n_vr(nvr):
+    n,v,r = nvr.rsplit("-",2)
+    return n, v+'-'+r
+
+def nvrmap(seq):
+    return dict( n_vr(nvr) for nvr in seq )
+
+osg_map1 = nvrmap(get_osg_list(tags[0]))
+osg_map2 = nvrmap(get_osg_list(tags[1]))
+
+def colorize(color, *seq):
+    return [ "\x1b[%sm%s\x1b[0m" % (color, x) for x in seq ]
+
+def colorize_vr(vr1, vr2):
+    v1,r1 = vr1.split('-')
+    v2,r2 = vr2.split('-')
+
+    if v1 != v2:
+        v1,v2 = colorize('1;32', v1, v2)
+    elif r1 != r2:
+        r1,r2 = colorize('1;34', r1, r2)
+
+    return map('-'.join, [[v1,r1],[v2,r2]])
+
+pkg_diffs = []
+for pkg in sorted(osg_map1):
+    if pkg in osg_map2:
+        vrcmp = rpmvercmp(osg_map1[pkg], osg_map2[pkg])
+        if vrcmp < 0 or show_all:
+            pkg_diffs.append([pkg, osg_map1[pkg], osg_map2[pkg]])
+
+if pkg_diffs:
+    pkg_diffs[:0] = [["Package"] + tags]
+    widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
+    pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
+    for i,row in enumerate(pkg_diffs):
+        spacing = [ w-len(x) for x,w in zip(row,widths) ]
+        if use_color and i > 1:
+            row[1:] = colorize_vr(*row[1:])
+        print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
+else:
+    print "No packages in '%s' behind version in '%s'" % tuple(tags)
+
