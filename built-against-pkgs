@@ -7,7 +7,7 @@ usage () {
   echo "package names can contain wildcards."
   echo
   echo "Options:"
-  echo "  -t     jira table output"
+  echo "  -t     plain text output instead of JIRA table format"
   echo "  -s     package list refers to src pkg names (osg's packages only)"
   echo "  -b     package list refers to bin pkg names (can include non-osg)"
   echo
@@ -24,10 +24,10 @@ usage () {
 absdir=$(dirname "$(readlink -f "$0")")
 PATH=$absdir:$PATH
 
-TBL=simple
+TBL=jirafy
 while [[ $1 = -* ]]; do
 case $1 in
-  -t ) TBL=jirafy ;;
+  -t ) TBL=simple ;;
    * ) usage ;;
 esac
 shift
@@ -61,7 +61,7 @@ nvras2pkgs () {
   xargs -r osg-koji rpminfo | awk '$1 == "SRPM:" {print $2}' | sort -u
 }
 
-jirafy () { awk '{print "|" B "|" $1 "|"}' B="$build"; }
+jirafy () { awk '{print "| " B " | " $1 " |"}' B="$build"; }
 simple () { awk '{print B, $1}'            B="$build"; }
 
 for build in "${builds[@]}"; do
