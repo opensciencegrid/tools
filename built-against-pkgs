@@ -1,0 +1,70 @@
+#!/bin/bash
+
+usage () {
+  echo "usage: $(basename "$0") [-t] build... {-b|-s} package..."
+  echo
+  echo "list versions of specified package(s) used for each build."
+  echo "package names can contain wildcards."
+  echo
+  echo "Options:"
+  echo "  -t     jira table output"
+  echo "  -s     package list refers to src pkg names (osg's packages only)"
+  echo "  -b     package list refers to bin pkg names (can include non-osg)"
+  echo
+  echo "Examples:"
+  echo "  $(basename "$0") blahp-1.18.15.bosco-3.osg33.el6 -b condor-classads"
+  echo "  $(basename "$0") blahp-1.18.15.bosco-3.osg33.el6 -s condor"
+  echo "  $(basename "$0") -t blahp-1.18.15.bosco-3.osg33.el{6,7} -b condor\\*"
+  echo "  $(basename "$0") -t htcondor-ce-1.19-1.osg{32,33}.el{5,6,7} -s condor"
+  exit
+}
+
+
+# want list-buildroot in path
+absdir=$(dirname "$(readlink -f "$0")")
+PATH=$absdir:$PATH
+
+TBL=simple
+while [[ $1 = -* ]]; do
+case $1 in
+  -t ) TBL=jirafy ;;
+   * ) usage ;;
+esac
+shift
+done
+
+builds=()
+while [[ $1 && $1 != -* ]]; do
+  builds+=("$1")
+  shift
+done
+
+case $1 in
+  -b ) B2S=cat ;;
+  -s ) B2S=nvras2pkgs ;;
+   * ) usage ;;
+esac
+shift
+
+[[ $1 ]] || usage
+
+ngrep () {
+  vr='(-[^-]+){2}$'
+  set -- "${@//\*/.*}"
+  set -- "${@//\?/.}"
+  set -- "${@/%/$vr}"
+  set -- "${@/#/-e}"
+  egrep "$@"
+}
+
+nvras2pkgs () {
+  xargs -r osg-koji rpminfo | awk '$1 == "SRPM:" {print $2}' | sort -u
+}
+
+jirafy () { awk '{print "|" B "|" $1 "|"}' B="$build"; }
+simple () { awk '{print B, $1}'            B="$build"; }
+
+for build in "${builds[@]}"; do
+  list-buildroot "$build" | $B2S | ngrep "$@" | $TBL
+done
+

@@ -1,0 +1,42 @@
+#!/bin/bash
+set -e
+
+usage () {
+  echo "usage: $(basename "$0") NVR [arch]"
+  echo "   or: $(basename "$0") NVR.arch"
+  echo
+  echo "List the packages installed in a koji buildroot for a given build"
+  exit
+}
+
+[[ $1 = [^-]*-[^-]*-[^-]* ]] || usage
+NVR=$1
+ARCH=$2
+
+case $NVR in
+  *.x86_64 | *.i[3-6]86 | *.noarch | .src )
+    [[ $# -eq 1 ]] || usage
+    ARCH=${NVR##*.}
+    NVR=${NVR%.*} ;;
+esac
+
+[[ $ARCH ]] || ARCH=$(
+  osg-koji buildinfo "$1"        |
+  sed -n '/^RPMs:$/,$p'          |
+  awk -F. 'NF>1 {print $(NF-1)}' |
+  egrep -xm1 'noarch|x86_64'
+)
+
+case $ARCH in
+  x86_64 | i[3-6]86 | noarch | src ) ;;  # OK
+  * ) usage ;;
+esac
+
+BUILDROOT=$(
+  osg-koji rpminfo "$NVR.$ARCH" |
+  awk '$1 == "Buildroot:" {print $2}
+           /No such rpm:/ {print >"/dev/stderr"; exit 1}'
+)
+
+osg-koji list-buildroot "$BUILDROOT"
+
