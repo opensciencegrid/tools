@@ -9,12 +9,30 @@ import subprocess
 from subprocess import Popen, PIPE
 import sys
 
+from optparse import OptionParser
+
 
 def get_args(argv):
+    usage = """\
+Usage; %prog <tag> <packages>...
+    OR %prog -t <tag1> [-t <tag2>]... <packages>..."""
+
+    parser = OptionParser(usage, prog=argv[0])
+    parser.add_option("-t", "--tag", dest="tags", help="Tag to get build(s) for.  May include commas or be specified multiple times.", action="append")
+
+    options, args = parser.parse_args(argv[1:])
+
     try:
-        return argv[1], argv[2:]
+        if not options.tags:
+            tags = [args.pop(0)]
+        else:
+            tags = options.tags
+        realtags = []
+        for t in tags:
+            realtags.extend(t.split(","))
+        return realtags, args
     except IndexError:
-        return None, None
+        parser.error("Incorrect number of arguments")
 
 
 def get_latest_build(tag, package):
@@ -51,35 +69,38 @@ def get_build_id(build_line):
 
 
 def main(argv):
-    tag, packages = get_args(argv)
-    if not (tag and packages) or '-h' in argv or '--help' in argv:
-        print >> sys.stderr, "Usage:", argv[0], "<tag> <packages>..."
-        return 2
+    tags, packages = get_args(argv)
 
     lines = []
+    errors = []
 
-    for package in packages:
-        latest_build = get_latest_build(tag, package)
-        if not latest_build:
-            print >> sys.stderr, "Error getting latest build for", package
-            return 1
-        build_line = get_build_line(latest_build)
-        if not build_line:
-            print >> sys.stderr, "Error getting build info for", latest_build
-            return 1
-        build_id = get_build_id(build_line)
-        if not build_id:
-            print >> sys.stderr, "Error getting build ID; text returned was:"
-            print >> sys.stderr, build_line
-            return 1
-        build_url = "https://koji-hub.batlab.org/koji/buildinfo?buildID=" + build_id
-        lines.append("| %(tag)s | [%(latest_build)s|%(build_url)s] |" % locals())
+    for tag in tags:
+        for package in packages:
+            latest_build = get_latest_build(tag, package)
+            if not latest_build:
+                errors.append("Error getting latest build for tag %s, package %s" % (tag, package))
+                continue
+            build_line = get_build_line(latest_build)
+            if not build_line:
+                errors.append("Error getting build info for %s" % latest_build)
+                continue
+            build_id = get_build_id(build_line)
+            if not build_id:
+                errors.append("Error getting build ID for %s; text returned was:\n%s" % (latest_build, build_line))
+                continue
+            build_url = "https://koji-hub.batlab.org/koji/buildinfo?buildID=" + build_id
+            lines.append("| %(tag)s | [%(latest_build)s|%(build_url)s] |" % locals())
+
+    ret = 0
+    if errors:
+        ret = 1
+        print >> sys.stderr, "\n".join(errors)
 
     if lines:
         print "|| Tag || Build ||"
         print "\n".join(lines)
 
-    return 0
+    return ret
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
