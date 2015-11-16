@@ -3,8 +3,9 @@
 usage () {
   echo "usage: $(basename "$0") [-t] build... {-b|-s} package..."
   echo
-  echo "list versions of specified package(s) used for each build."
-  echo "package names can contain wildcards."
+  echo "List versions of specified package(s) used for each build."
+  echo "Builds and package names can contain wildcards.  If a specified build"
+  echo "is not an exact match in koji, .osg* will be appended."
   echo
   echo "Options:"
   echo "  -t     plain text output instead of JIRA table format"
@@ -64,7 +65,16 @@ nvras2pkgs () {
 jirafy () { awk '{print "| " B " | " $1 " |"}' B="$build"; }
 simple () { awk '{print B, $1}'                B="$build"; }
 
+
+# resolve build globs to actual builds
+builds_ex=
 for build in "${builds[@]}"; do
+  build_ex=$(osg-koji search build "$build")
+  [[ $build_ex ]] || build_ex=$(osg-koji search build "$build.osg*")
+  builds_ex+=" $build_ex"
+done
+builds_ex=$(echo $builds_ex | xargs -n1 | sort)
+for build in $builds_ex; do
   list-buildroot "$build" | $B2S | ngrep "$@" | $TBL
 done
 
