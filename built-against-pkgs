@@ -1,13 +1,14 @@
 #!/bin/bash
 
 usage () {
-  echo "usage: $(basename "$0") [-t] build... {-b|-s} package..."
+  echo "usage: $(basename "$0") [-h|-t] build... {-b|-s} package..."
   echo
   echo "List versions of specified package(s) used for each build."
   echo "Builds and package names can contain wildcards.  If a specified build"
   echo "is not an exact match in koji, .osg* will be appended."
   echo
   echo "Options:"
+  echo "  -h     include JIRA header"
   echo "  -t     plain text output instead of JIRA table format"
   echo "  -s     package list refers to src pkg names (osg's packages only)"
   echo "  -b     package list refers to bin pkg names (can include non-osg)"
@@ -30,6 +31,7 @@ TBL=jirafy
 while [[ $1 = -* ]]; do
 case $1 in
   -t ) TBL=simple ;;
+  -h ) HDR=Y ;;
    * ) usage ;;
 esac
 shift
@@ -75,6 +77,8 @@ for build in "${builds[@]}"; do
   builds_ex+=" $build_ex"
 done
 builds_ex=$(echo $builds_ex | xargs -n1 | sort)
+
+[[ $HDR = Y ]] && echo "|| Build || Built Against ||"
 for build in $builds_ex; do
   list-buildroot "$build" | $B2S | ngrep "$@" | $TBL
 done
