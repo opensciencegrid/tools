@@ -2,10 +2,11 @@
 set -e
 
 usage () {
-  echo "usage: $(basename "$0") NVR [arch]"
-  echo "   or: $(basename "$0") NVR.arch"
+  echo "usage: $(basename "$0") NVR [arch]  # build NVR + target arch"
+  echo "   or: $(basename "$0") NVR.arch    # target binary NVRA"
   echo
   echo "List the packages installed in a koji buildroot for a given build"
+  echo "or binary rpm."
   exit
 }
 
@@ -13,19 +14,23 @@ usage () {
 NVR=$1
 ARCH=$2
 
-case $NVR in
-  *.x86_64 | *.i[3-6]86 | *.noarch | .src )
-    [[ $# -eq 1 ]] || usage
-    ARCH=${NVR##*.}
-    NVR=${NVR%.*} ;;
-esac
+get_1st_nvra () {
+  osg-koji buildinfo "$NVR"         |
+  sed -n 's/\.rpm$//; /^RPMs:$/,$p' |
+  awk -F/ '{print $NF}'             |
+  egrep -m1 "\.($1)$"
+}
 
-[[ $ARCH ]] || ARCH=$(
-  osg-koji buildinfo "$1"        |
-  sed -n '/^RPMs:$/,$p'          |
-  awk -F. 'NF>1 {print $(NF-1)}' |
-  egrep -xm1 'noarch|x86_64'
-)
+if [[ $ARCH ]]; then
+  NVRA=$(get_1st_nvra "$ARCH")
+else
+  case $NVR in
+    *.x86_64 | *.i[3-6]86 | *.noarch | .src ) NVRA=$NVR ;;
+
+    * ) NVRA=$(get_1st_nvra 'noarch|x86_64') ;;
+  esac
+  ARCH=${NVRA##*.}
+fi
 
 case $ARCH in
   x86_64 | i[3-6]86 | noarch | src ) ;;  # OK
@@ -33,7 +38,7 @@ case $ARCH in
 esac
 
 BUILDROOT=$(
-  osg-koji rpminfo "$NVR.$ARCH" |
+  osg-koji rpminfo "$NVRA" |
   awk '$1 == "Buildroot:" {print $2}
            /No such rpm:/ {print >"/dev/stderr"; exit 1}'
 )
