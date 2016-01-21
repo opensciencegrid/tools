@@ -7,7 +7,8 @@ Usage:
 Compare and print any version differences between RPMs installed in both of
 two osg-test run directories, as found in output-NNN/output/osg-test-*.log
 
-The outputs can also be a root.log from a koji/mock build.
+The outputs can also be a root.log from a koji/mock build, or the raw output
+of an 'rpm -qa' command.
 
 Options:
   -A, --no-strip-arch  don't attempt to strip .arch from package names
@@ -30,7 +31,7 @@ dirs       = []
 strip_arch = True
 strip_dist = True
 
-arch_pat = r'\.(x86_64|i[3-6]86|noarch)$'
+arch_pat = r'\.(x86_64|i[3-6]86|noarch|src)$'
 dist_pat = r'((\.osg(\d+)?)?\.[es]l[5-9](_[\d.]+)?(\.centos)?|\.osg|\.fc\d+)$'
 
 def usage():
@@ -71,14 +72,30 @@ def nvrgen(items):
         yield [na,evr]
         items[:2] = []
 
-def isfile(fn):
+def isdir(fn):
     try:
-        return stat.S_ISREG(os.stat(fn).st_mode)
+        return stat.S_ISDIR(os.stat(fn).st_mode)
     except OSError:
         return False
 
+def rpm_qa2na_vr(line):
+    line = re.sub(r'(\.rpm)?\r?\n?$', '', line)
+    if re.search(arch_pat, line):
+        nvr,a = line.rsplit('.', 1)
+    else:
+        nvr,a = line, None
+    n,v,r = nvr.rsplit('-',2)
+    if a and not strip_arch:
+        na = '.'.join((n,a))
+    else:
+        na = n
+    if strip_dist:
+        r = re.sub(dist_pat, '', r)
+    vr = '-'.join((v,r))
+    return [na,vr]
+
 def nvrmap(output):
-    if isfile(output):
+    if not isdir(output):
         log = output
     else:
         globpat = "%s/output/osg-test-*.log" % output
@@ -90,14 +107,18 @@ def nvrmap(output):
 
     # split this way since there can be more than one item per line
     txt = open(log).read()
-    # strip "DEBUG util.py:388:  " in case this is coming from a root.log
-    txt = re.sub(r'\n[A-Z]+ .*?:\d+:  ', r'\n', txt)
-    # don't include Install list from cleanup/downgrade
-    txt = re.sub(r'\nosgtest: .* special_cleanup[\d\D]*', r'\n', txt)
-    items_pat = (r'^(?:Dependency )?(?:Installed|Updated|Replaced):\n'
-                 r'(.*?)\n(?:\n|(?=[^ ]))')
-    items = ' '.join(re.findall(items_pat, txt, re.S | re.M)).split()
-    return dict(nvrgen(items))
+    if ' ' in txt:
+        # strip "DEBUG util.py:388:  " in case this is coming from a root.log
+        txt = re.sub(r'\n[A-Z]+ .*?:\d+:  ', r'\n', txt)
+        # don't include Install list from cleanup/downgrade
+        txt = re.sub(r'\nosgtest: .* special_cleanup[\d\D]*', r'\n', txt)
+        items_pat = (r'^(?:Dependency )?(?:Installed|Updated|Replaced):\n'
+                     r'(.*?)\n(?:\n|(?=[^ ]))')
+        items = ' '.join(re.findall(items_pat, txt, re.S | re.M)).split()
+        return dict(nvrgen(items))
+    else:
+        # at most 1-word per line; assume this is 'rpm -qa' output
+        return dict(map(rpm_qa2na_vr, txt.split()))
 
 rpms1,rpms2 = map(nvrmap,dirs)
 
