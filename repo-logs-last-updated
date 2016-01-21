@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# reports age of oldest update-repo log for each repo* server
+
+repo_log_timestamps () {
+  wget -qO- "http://${1}.grid.iu.edu/web/log/?C=M;O=A" |
+  perl -lne '
+    @f = m{<td.*?>(.*?)</td>}g;
+    ($log,$ts) = @f[1,2];
+    ($log) = $log =~ m{<a.*?>(.*)</a>};
+    print "$ts $log" if $log =~ /^update/;
+  '
+}
+
+repo_log_age () {
+  repo_log_timestamps "$1" | tail -1 |
+  ( read dt tm lf
+    ts=$(date -d "$dt $tm UTC" +%s)
+    nowts=$(date +%s)
+    elapsed=$((nowts - ts))
+    echo $elapsed
+  )
+}
+
+ela2h () {
+  if (( $1 >= 60*60*24*2 )); then
+    d=$(( $1 / (60*60*24) ))
+    echo "${d}d"
+  elif (( $1 >= 60*60 )); then
+    h=$(( $1 / (60*60) ))
+    echo "${h}h"
+  elif (( $1 >= 60 )); then
+    m=$(( $1 / 60 ))
+    echo "${m}m"
+  else
+    echo "${1}s"
+  fi
+}
+
+echo "server    last-updated"
+
+for r in repo{1,2,-itb}; do
+  ela=$(repo_log_age $r)
+  age=$(ela2h $ela)
+  printf '%-9s %s\n' $r "$age ago"
+done
+
