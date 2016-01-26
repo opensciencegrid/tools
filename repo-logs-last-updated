@@ -8,12 +8,12 @@ repo_log_timestamps () {
     @f = m{<td.*?>(.*?)</td>}g;
     ($log,$ts) = @f[1,2];
     ($log) = $log =~ m{<a.*?>(.*)</a>};
-    print "$ts $log" if $log =~ /^update/;
+    print "$ts $log" if $log =~ /^update_repo/;
   '
 }
 
 repo_log_age () {
-  repo_log_timestamps "$1" | tail -1 |
+  repo_log_timestamps "$1" | head -1 |
   ( read dt tm lf
     ts=$(date -d "$dt $tm UTC" +%s)
     nowts=$(date +%s)
