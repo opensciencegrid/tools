@@ -1,0 +1,76 @@
+#!/usr/bin/ruby
+# coding: utf-8
+
+dashes = '-' * 75
+
+twiki = File.read(ARGV[0])
+
+# Initialize raw text from TWiki format
+text = String.new(twiki)
+
+# Clean up specific TWiki markup
+text.gsub!(%r{Work with !TimC .*$\n+}, "")
+text.gsub!(%r{<!--.*?-->}m, "")
+text.gsub!(%r{\n*^---\+{1}\s+(.*?)$}, "\\1")
+text.gsub!(%r{\n*^---\+{2}\s+(.*?)$}) { |s| "\n\n\n#{dashes}\n#{$1.upcase}\n#{dashes}" }
+text.gsub!(%r{\n*^---\+{3}\s+(.*?)$\n+}) { |s| "\n\n#{$1.upcase}\n" }
+text.gsub!(%r{\n*^---\+{4}\s+(.*?)$\n+}, "\n\\1\n")
+text.gsub!(%r{^ {3}\*\s+}, "* ")
+text.gsub!(%r{^ {6}\*\s+}, "   - ")
+text.gsub!(%r{^ {9}\*\s+}, "     . ")
+
+# Item owners
+text.gsub!(%r{\*\[(\w+)\]\*}, '[\1]')
+
+text.gsub!(%r{(\W)!(\w)}, '\1\2')
+text.gsub!(%r{\*(.*?)\*}, "\\1")
+text.gsub!(%r{\n+^Attending:}, "\nAttending:")
+
+# Table
+text.gsub!(%r{((?:^\|.*\|\n)+)\n}) do
+  table = ''
+  rows = $1.split(%r{\s*\n\s*}).collect do |row|
+    row.gsub!(%r{^ *\| *}, "")
+    row.gsub!(%r{ *\| *$}, "")
+    row.split(%r{\s*\|\s*})
+  end
+
+  # Calculate maximum column widths
+  widths = Hash.new(0)
+  rows.each { |r| r.each_with_index { |c, i| widths[i] = [widths[i], c.length].max } }
+
+  # Generate table
+  table = ''
+  rows.each do |row|
+    row_array = Array.new
+    row.each_with_index do |column, index|
+      row_array << sprintf("%-*s", widths[index], column)
+    end
+    table += row_array.join('   ') + "\n"
+  end
+  table += "\n"
+
+  table
+end
+text.gsub!(%r{^%TABLE.*$\n}, "")
+
+# Links
+text.gsub!(%r{\[\[[^\]]+\]\[([^\]]+)\]\]}, '\1')
+
+# Whitespace
+text.gsub!(/\A\n*/, '')
+text.gsub!(/^NOTES$\n+/, "NOTES\n\n")
+
+# HTML entities
+text.gsub!('&hellip;', '...')
+text.gsub!('&nbsp;', ' ')
+text.gsub!('&minus;', '−')
+
+# General clean-up
+text.gsub!(%r{</?span.*?>}, '')
+text.gsub!(%r{%HI%}, '[')
+text.gsub!(%r{%IH%}, ']')
+text.gsub!(%r{(\W)=(\w)}, '\1\2')   # Left-side "=" character
+text.gsub!(%r{(\w)=(\W)}, '\1\2')   # Right-side "=" character
+
+puts text
