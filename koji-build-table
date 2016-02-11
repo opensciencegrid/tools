@@ -14,11 +14,15 @@ from optparse import OptionParser
 
 def get_args(argv):
     usage = """\
-Usage; %prog <tag> <packages>...
-    OR %prog -t <tag1> [-t <tag2>]... <packages>..."""
+Usage; %prog [-f tag|build] <tag> <packages>...
+    OR %prog [-f tag|build] -t <tag1> [-t <tag2>]... <packages>..."""
 
     parser = OptionParser(usage, prog=argv[0])
-    parser.add_option("-t", "--tag", dest="tags", help="Tag to get build(s) for.  May include commas or be specified multiple times.", action="append")
+    parser.add_option("-t", "--tag", dest="tags", action="append",
+        help="Tag to get build(s) for.  May include commas or be specified multiple times.")
+    parser.add_option("-f", "--format", dest="tblformat", default="build", type="choice", choices=["tag", "build"],
+        help="Table format: either 'tag' (tag in first column and sorted by tag)"
+        " or 'build' (build in first column and sorted by build)")
 
     options, args = parser.parse_args(argv[1:])
 
@@ -30,7 +34,7 @@ Usage; %prog <tag> <packages>...
         realtags = []
         for t in tags:
             realtags.extend(t.split(","))
-        return realtags, args
+        return options.tblformat, realtags, args
     except IndexError:
         parser.error("Incorrect number of arguments")
 
@@ -69,27 +73,37 @@ def get_build_id(build_line):
 
 
 def main(argv):
-    tags, packages = get_args(argv)
+    tblformat, tags, packages = get_args(argv)
 
     lines = []
     errors = []
 
-    for tag in tags:
-        for package in packages:
-            latest_build = get_latest_build(tag, package)
-            if not latest_build:
-                errors.append("Error getting latest build for tag %s, package %s" % (tag, package))
-                continue
-            build_line = get_build_line(latest_build)
-            if not build_line:
-                errors.append("Error getting build info for %s" % latest_build)
-                continue
-            build_id = get_build_id(build_line)
-            if not build_id:
-                errors.append("Error getting build ID for %s; text returned was:\n%s" % (latest_build, build_line))
-                continue
-            build_url = "https://koji-hub.batlab.org/koji/buildinfo?buildID=" + build_id
-            lines.append("| %(tag)s | [%(latest_build)s|%(build_url)s] |" % locals())
+    tag_package_table = [[tag, package] for tag in tags for package in packages]
+
+    if tblformat == 'tag':
+        header = "|| Tag || Build ||"
+        tag_package_table.sort(key=lambda pair:pair[0])
+        formatstr = "| %(tag)s | [%(latest_build)s|%(build_url)s] |"
+    else: # tblformat == 'build'
+        tag_package_table.sort(key=lambda pair:pair[1])
+        header = "|| Build || Tag ||"
+        formatstr = "| [%(latest_build)s|%(build_url)s] | %(tag)s |"
+
+    for tag, package in tag_package_table:
+        latest_build = get_latest_build(tag, package)
+        if not latest_build:
+            errors.append("Error getting latest build for tag %s, package %s" % (tag, package))
+            continue
+        build_line = get_build_line(latest_build)
+        if not build_line:
+            errors.append("Error getting build info for %s" % latest_build)
+            continue
+        build_id = get_build_id(build_line)
+        if not build_id:
+            errors.append("Error getting build ID for %s; text returned was:\n%s" % (latest_build, build_line))
+            continue
+        build_url = "https://koji-hub.batlab.org/koji/buildinfo?buildID=" + build_id
+        lines.append(formatstr % locals())
 
     ret = 0
     if errors:
@@ -97,7 +111,7 @@ def main(argv):
         print >> sys.stderr, "\n".join(errors)
 
     if lines:
-        print "|| Tag || Build ||"
+        print header
         print "\n".join(lines)
 
     return ret
