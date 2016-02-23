@@ -4,7 +4,7 @@ set -e
 # runs rpmlint against all the latest binary rpms from the osg-release repos.
 # keeps all rpmlint logs, but in particular reports rpms with rpath errors.
 
-koji_baseurl=http://koji-hub.batlab.org
+koji_baseurl=http://koji.chtc.wisc.edu
 arches=(
   x86_64
   i386

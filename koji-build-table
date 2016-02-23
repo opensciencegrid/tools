@@ -11,6 +11,7 @@ import sys
 
 from optparse import OptionParser
 
+KOJI_WEB = "https://koji-hub.batlab.org"
 
 def get_args(argv):
     usage = """\
@@ -102,7 +103,7 @@ def main(argv):
         if not build_id:
             errors.append("Error getting build ID for %s; text returned was:\n%s" % (latest_build, build_line))
             continue
-        build_url = "https://koji-hub.batlab.org/koji/buildinfo?buildID=" + build_id
+        build_url = KOJI_WEB + "/koji/buildinfo?buildID=" + build_id
         lines.append(formatstr % locals())
 
     ret = 0
