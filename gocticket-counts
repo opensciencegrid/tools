@@ -42,11 +42,14 @@ hdridx = dict((h,i) for (i,h) in enumerate(hdrs))
 submit = hdridx["Submit_Date"]
 owner = hdridx["Assignees"]
 title = hdridx["Title"]
+NAD = hdridx["NAD"]
 ID = hdridx["ID"]
 
+today = time.strftime("%F", time.localtime(time.time()))
 olddate = time.strftime("%F", time.localtime(time.time() - 60*60*24*warn_days))
 
 software = []
+late = []
 old = []
 
 ticket_re = r'''<tr onclick="window.name = 'gocticket_list'(.*?)</tr>'''
@@ -62,6 +65,8 @@ for tr in ticket_trs:
         software.append(tds)
         if tds[submit] < olddate:
             old.append(tds)
+        if tds[NAD] < today:
+            late.append(tds)
 
 software.sort(key=lambda x: int(x[ID]))
 
@@ -72,6 +77,10 @@ def disp_tickets(trs):
 print len(software), "open Software Support ticket(s)"
 if show_all:
     disp_tickets(software)
+
+print
+print len(late), "Software Support ticket(s) open past their NAD"
+disp_tickets(late)
 
 print
 print len(old), "Software Support ticket(s) open for over %d days" % warn_days
