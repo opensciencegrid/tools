@@ -30,20 +30,35 @@ cd "$project"
 filter_branch () {
   git filter-branch -f --msg-filter '
     awk '\''
-       /^git-svn-id:/ {print > "git-svn-note.txt"}
+       /^git-svn-id:/ {print > "/dev/fd/3"; got_id=1}
       !/^git-svn-id:/ {print}
+      END { if (!got_id) {print "" > "/dev/fd/3"} }
     '\''
-
-    sed -ri '\''
-      s!^git-svn-id: file:///p/condor/workspaces/vdt/svn/!!;
-      s/ .*$//;
-      s/^(.*)@([0-9]+)$/r\2 \1/;
-    '\'' git-svn-note.txt
   ' --commit-filter '
     NEW_COMMIT=$(git commit-tree "$@")
     echo $NEW_COMMIT
-    git notes add -f -F git-svn-note.txt $NEW_COMMIT
-  ' "$@" 2> >(grep -v "^Overwriting existing notes for object" >&2)
+    echo $NEW_COMMIT >&4
+  ' "$@" 3>> ../git-svn-id-tags.txt 4>> ../git-svn-rewrite-shas.txt
+}
+
+add_notes () {
+  svn_url=$(git config --local --get svn-remote.svn.url)
+
+  sed -ri '
+    s!^git-svn-id: '"$svn_url"'/!!;
+    s/ .*$//;
+    s/^(.*)@([0-9]+)$/r\2 \1/;
+  ' ../git-svn-id-tags.txt
+
+  mkdir ../git-notes
+  paste ../git-svn-rewrite-shas.txt ../git-svn-id-tags.txt \
+  | awk -F'\t' 'NF==2 && !u[$0]++ {print $2 >> "../git-notes/" $1}'
+
+  
+  for sha in $(cd ../git-notes
+               grep . * | sort -Vk2 -t: | cut -d: -f1 | awk '!u[$0]++'); do
+    git notes add -F ../git-notes/"$sha" "$sha"
+  done
 }
 
 if [[ $(git rev-parse master) = $(git rev-parse trunk) ]]; then
@@ -61,13 +76,15 @@ filter_branch
 for x in $(git branch -r); do
   filter_branch refs/remotes/"$x"
   case $x in
-      tags/*@[1-9]* ) git tag "${x#tags/}"-tag refs/remotes/"$x" ;;
-      tags/* ) git tag "${x#tags/}" refs/remotes/"$x" ;;
-    *@[1-9]* ) git tag "$x" refs/remotes/"$x" ;;
-           * ) git branch "$x" refs/remotes/"$x" ;;
+    origin/tags/*@[1-9]* ) git tag "${x#origin/tags/}"-tag refs/remotes/"$x" ;;
+    origin/tags/*   ) git tag "${x#origin/tags/}" refs/remotes/"$x" ;;
+    origin/*@[1-9]* ) git tag "${x#origin/}" refs/remotes/"$x" ;;
+           origin/* ) git branch "${x#origin/}" refs/remotes/"$x" ;;
   esac
   git branch -rd "$x"
 done
+
+add_notes
 
 rm -rf .git/svn .git/refs/original
 git reflog expire --expire=now --all
