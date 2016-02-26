@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# run from a project.git bare repo, generated with git-svn-bare-setup.
+# this detects stale branches, deleted from svn, and prints commands to:
+#  - tag each (branch@rev) that's not fully merged into other branches or tags
+#  - delete each stale branch
+
+getsvnrev () {
+  read gitsvnid pathspec repoid
+  [[ $gitsvnid = git-svn-id: ]] || return
+  echo "${pathspec#*@}"
+}
+
+still_in_svn () {
+  read gitsvnid pathspec
+  [[ $gitsvnid = git-svn-id: ]] || return
+  svn info "${pathspec%%@*}" &>/dev/null
+}
+
+list_deleted_branches () {
+  for branch in $(git branch | cut -c3-); do
+    git log -1 "refs/heads/$branch" | tail -1 | still_in_svn || echo "$branch"
+  done
+}
+
+commit_is_merged () {
+  git branch --contains "refs/heads/$1" | cut -c3- | fgrep -qvx "$1" ||
+  git tag --contains "refs/heads/$1" | fgrep -qvx "$1"
+}
+
+tagbranch () {
+  rev=$(git log -1 "refs/heads/$1" | tail -1 | getsvnrev)
+  echo git tag "$1@$rev" "refs/heads/$1"
+}
+
+list_deleted_branches_to_bag () {
+  for branch in $(git branch | cut -c3-); do
+    if ! git log -1 "refs/heads/$branch" | tail -1 | still_in_svn; then
+      commit_is_merged "$branch" || tagbranch "$branch"
+      echo git branch -D "$branch"
+    fi
+  done
+}
+
+list_deleted_branches_to_bag
