@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# OBSOLETE: this was a proof of concept to show that all the features of
+#           subgit (including per-revision git notes) can be accomplished
+#           with the standard git-svn tool.
+#
+#           Use 'git-svn-bare-setup' instead.
+
 usage () {
   echo "$(basename "$0") project"
   exit
