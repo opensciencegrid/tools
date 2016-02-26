@@ -1,0 +1,48 @@
+#!/bin/bash
+set -e
+
+usage () {
+  echo "usage: $(basename "$0") software-project"
+  echo
+  echo "create a bare git-svn repo from a vdt svn/software/project,"
+  echo "and set up a github remote mirror for pushing."
+  exit
+}
+
+case $1 in
+  ''|-* ) usage ;;
+esac
+
+project=$1
+top=file:///p/condor/workspaces/vdt/svn
+pubtop=https://vdt.cs.wisc.edu/svn
+basepath=software/$project
+authors=/p/condor/workspaces/vdt/svn-access/authors.txt
+github_owner=opensciencegrid
+
+mkdir "$project.git"
+cd "$project.git"
+
+hastrunk () { svn info "$top/$basepath/trunk" &>/dev/null; }
+
+git init --bare
+git config svn-remote.svn.url "$top"
+git config svn-remote.svn.rewriteRoot "$pubtop"
+git config svn.authorsFile "$authors"
+if hastrunk; then
+  git config svn-remote.svn.fetch    "$basepath/trunk:refs/heads/master"
+  git config svn-remote.svn.branches "$basepath/branches/*:refs/heads/*"
+  git config svn-remote.svn.tags     "$basepath/tags/*:refs/tags/*"
+else
+  git config svn-remote.svn.fetch    "$basepath:refs/heads/master"
+fi
+
+git svn fetch
+git branch --list '*@*' | xargs -r git branch -D
+git tag --list '*@*' | xargs -r git tag -d
+git gc
+git svn gc
+
+remote=git@github.com:$github_owner/$project.git
+git remote add --mirror=push github "$remote"
+
