@@ -12,13 +12,14 @@ import re
 
 baseurl = 'https://ticket.grid.iu.edu'
 listurl = baseurl + '/list/open'
+warn_days = 30
 
 def usage():
     script = os.path.basename(__file__)
     print "usage: %s [assignee_pattern ...]" % script
     print "   or: %s [-a|--all]" % script
     print
-    print "displays software tickets open for over 30 days."
+    print "displays software tickets open for over %d days." % warn_days
     print "optionally display tickets matching asignee(s), or all tickets."
     sys.exit(0)
 
@@ -43,7 +44,7 @@ owner = hdridx["Assignees"]
 title = hdridx["Title"]
 ID = hdridx["ID"]
 
-olddate = time.strftime("%F", time.localtime(time.time() - 60*60*24*30))
+olddate = time.strftime("%F", time.localtime(time.time() - 60*60*24*warn_days))
 
 software = []
 old = []
@@ -73,7 +74,7 @@ if show_all:
     disp_tickets(software)
 
 print
-print len(old), "Software Support ticket(s) open for over 30 days"
+print len(old), "Software Support ticket(s) open for over %d days" % warn_days
 disp_tickets(old)
 
 if sys.argv[1:]:
