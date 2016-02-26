@@ -7,10 +7,28 @@
 import urllib2
 import time
 import sys
+import os
 import re
 
 baseurl = 'https://ticket.grid.iu.edu'
 listurl = baseurl + '/list/open'
+
+def usage():
+    script = os.path.basename(__file__)
+    print "usage: %s [assignee_pattern ...]" % script
+    print "   or: %s [-a|--all]" % script
+    print
+    print "displays software tickets open for over 30 days."
+    print "optionally display tickets matching asignee(s), or all tickets."
+    sys.exit(0)
+
+show_all = False
+if sys.argv[1:]:
+    if sys.argv[1] in ('-a','--all'):
+        sys.argv[:1] = []
+        show_all = True
+    elif sys.argv[1] in ('-h','--help'):
+        usage()
 
 html = urllib2.urlopen(listurl).read()
 html = html.replace('&nbsp;', ' ')
@@ -33,18 +51,30 @@ old = []
 ticket_re = r'''<tr onclick="window.name = 'gocticket_list'(.*?)</tr>'''
 ticket_trs = re.findall(ticket_re, html, re.S)
 
+def unescape(x):
+    return re.sub(r'&#(\d+);', (lambda m: chr(int(m.group(1)))), x)
+
 for tr in ticket_trs:
     tds = re.findall(r'<td>(.*?)</td>', tr, re.S)
+    tds[title] = unescape(tds[title])
     if re.search(r'Software Support', tds[owner]):
         software.append(tds)
         if tds[submit] < olddate:
             old.append(tds)
 
+software.sort(key=lambda x: int(x[ID]))
+
+def disp_tickets(trs):
+    for tds in trs:
+        print " - %s [%s/%s] %s" % (tds[submit], baseurl, tds[ID], tds[title])
+
 print len(software), "open Software Support ticket(s)"
+if show_all:
+    disp_tickets(software)
+
 print
 print len(old), "Software Support ticket(s) open for over 30 days"
-for tds in old:
-    print " - %s [%s/%s] %s" % (tds[submit], baseurl, tds[ID], tds[title])
+disp_tickets(old)
 
 if sys.argv[1:]:
     pat = '|'.join(sys.argv[1:])
@@ -53,6 +83,5 @@ if sys.argv[1:]:
     print "%d Software Support ticket(s) with Asssignees matching '%s'" % (
         len(trs), pat)
     
-    for tds in trs:
-        print " - %s [%s/%s] %s" % (tds[submit], baseurl, tds[ID], tds[title])
+    disp_tickets(trs)
 
