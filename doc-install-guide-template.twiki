@@ -1,0 +1,112 @@
+---+ Installing, Configuring, Using, and Troubleshooting {{COMPONENT}}
+
+%TOC{depth="3"}%
+
+---++ About This Guide
+
+<!-- very brief and high-level overview of the software -->
+The ... software [solves some problem for some user group].
+
+<!-- very brief overview of this guide -->
+Use this guide to ...
+
+---++ Introduction to {{COMPONENT}}
+
+<!-- longer introduction to the software, but concise and high-level -->
+<!-- most readers will skip this section so it should omit instructions -->
+
+---++ Before Starting
+
+<!-- pre-requisites and one-time preparations - see other docs for ideas -->
+
+---++ Installing {{COMPONENT}}
+
+<!-- start with a brief prose introduction - see other docs for ideas -->
+<!-- yum install procedure, no configuration here -->
+
+---++ Configuring {{COMPONENT}}
+
+<!-- start with a brief prose introduction - see other docs for ideas -->
+<!-- mandatory configuration procedure(s) -->
+<!-- divide into logical subsections if needed - e.g., see InstallHTCondorCE -->
+
+---+++ Optional configuration
+
+<!-- prose introduction first -->
+<!-- if this section is very long, consider making a separate document -->
+
+---++++ Configuring ...
+
+<!-- start with a brief introduction of the use case -->
+<!-- answer the question: how do I decide whether I need to do this step? -->
+<!-- then the procedure -->
+
+---++ Using {{COMPONENT}}
+
+---+++ Managing {{COMPONENT}} and associated services
+
+<!-- introduce services in a table - see other docs for format -->
+
+Start the services in the order listed and stop them in reverse order.
+As a reminder, here are common service commands (all run as =root=):
+
+%TABLE{sort="off"}%
+| *To &hellip;* | *Run the command &hellip;* |
+| Start a service | =service <em>SERVICE-NAME</em> start= |
+| Stop a service | =service <em>SERVICE-NAME</em> stop= |
+| Enable a service to start during boot | =chkconfig <em>SERVICE-NAME</em> on= |
+| Disable a service from starting during boot | =chkconfig <em>SERVICE-NAME</em> off= |
+
+---+++ [Doing something with {{COMPONENT}}
+
+<!-- these sections are for manual runs, admin tools, etc. -->
+<!-- start each section by answering: what problem do I solve with this? -->
+<!-- then a procedure and/or usage info -->
+
+---++ Validating {{COMPONENT}}
+
+<!-- brief prose introduction -->
+<!-- after installing and configuring, how does an admin make sure it works? -->
+<!-- if this section is very long, consider making a separate document -->
+
+---++ Troubleshooting {{COMPONENT}}
+
+<!-- brief prose introduction -->
+<!-- how does an admin recognize (searchable!) and solve common issues? -->
+<!-- if this section is very long, consider making a separate document -->
+
+---+++ Important file locations
+
+<!-- brief prose introduction -->
+<!-- document files and *why* one would use them -->
+<!-- a table is often a good format -->
+
+---++ Getting Help
+
+To get assistance, please use [[Documentation.HelpProcedure][this page]].
+
+---++ Reference
+
+<!-- if any, link to other useful documents - explain *why* each is useful -->
+<!-- remove irrelevant sections below and add others as needed -->
+
+---+++ Users
+
+<!-- brief prose introduction -->
+<!-- in a table, list users that the software needs -->
+<!-- in the comments, explain what each user does, owns, needs, etc. -->
+<!-- more detailed requirements can go in prose afterward -->
+
+---+++ Certificates
+
+<!-- brief prose introduction -->
+<!-- in a table, list certificates that the software needs and owning user -->
+<!-- more detailed requirements can go in prose afterward -->
+
+See [[InstallCertScripts][instructions]] to request a service certificate.
+
+---+++ Networking
+
+<!-- brief prose introduction -->
+<!-- in a table, list ports, etc., that the software needs -->
+<!-- more detailed requirements can go in prose afterward -->
