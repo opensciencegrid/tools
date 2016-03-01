@@ -1,0 +1,177 @@
+#!/usr/bin/env python
+# (ignore bad script name) pylint: disable=C0103
+from __future__ import print_function
+
+import os
+import re
+import pwd
+import sys
+import getopt
+import socket
+import smtplib
+import subprocess
+import ConfigParser
+from StringIO import StringIO
+
+# Pylint import checks don't handle conditional imports well
+try:
+    from email.mime.text import MIMEText # Python 2.6; pylint: disable=F0401,E0611
+except ImportError:
+    from email.MIMEText import MIMEText # Python 2.4; pylint: disable=F0401,E0611
+
+SCRIPT_NAME = 'afs-quota-notify'
+SECTION = 'afs-quota-notify'
+
+USAGE = r'''
+Usage: {SCRIPT_NAME} [options] [<config file>]
+
+Send email if AFS directories are close to being over quota. The values
+'email', 'threshold', and 'directories' are read from the '{SECTION}' section
+of an ini-style config file, or can be passed via command-line options.
+
+Options:
+
+    -d <directories>      A comma or space separated list of the directories
+                          to check
+
+    -e <email addresses>  A comma or space separated list of who to email
+
+    -h                    Print this message
+
+    -n                    Dry run: don't actually email, just print what would
+                          be sent
+
+    -t <percent>          The warning threshold as a percentage from 0.0% to
+                          100.0%
+'''.format(**globals())
+
+DEFAULT_CONFIG = r'''
+[{SECTION}]
+
+email = matyas+cron@cs.wisc.edu
+
+directories = /p/vdt/public/html
+              /p/vdt/public/html/tarball-client
+              /p/vdt/public/html/upstream
+              /p/condor/workspaces/vdt
+              /p/condor/workspaces/vdt/git
+
+threshold = 90.0
+'''.format(**globals())
+
+
+def send_email(recipients, subject, text, dry_run=False):
+    msg = MIMEText(text)
+
+    username = pwd.getpwuid(os.getuid()).pw_name
+    hostname = socket.gethostname()
+
+    msg['Subject'] = subject
+    msg['To'] = ', '.join(recipients)
+    msg['From'] = username + "@" + hostname
+
+    if dry_run:
+        print(msg.as_string())
+    else:
+        smtp = smtplib.SMTP('localhost')
+        smtp.sendmail(msg['From'], recipients, msg.as_string())
+        smtp.quit()
+
+
+def _disk_quota_percent_used(listquota_line):
+    """Helper for decoding the output of 'fs listquota'. Takes a line such as:
+    u.matyas-497381             20000000   12209872   61%          0%
+    and returns the percentage of quota used (as a float, out of 100.0).  (Does
+    not use the percentage from the line, but calculates it from the total and
+    used (the first two numbers)).  Can return TypeError or IndexError if the
+    line is not in the expected format.
+
+    """
+    line_split = re.split(r'\s+', listquota_line)
+    quota = line_split[1]
+    used = line_split[2]
+    percent = (float(used) / float(quota)) * 100.0
+
+    return percent
+
+
+def get_disk_usage_percent(directory):
+    """Return the percent of disk quota used in the directory. 'directory'
+    must be on AFS. Uses 'fs listquota' to get the quota remaining.
+
+    """
+    listquota_proc = subprocess.Popen(
+        ['/usr/bin/fs', 'listquota', directory], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    listquota_output = listquota_proc.communicate()[0].split("\n")
+    if listquota_proc.returncode != 0:
+        print('{0}: fs listquota returned {1:d}. Output: {2}'.format(directory, listquota_proc.returncode, listquota_output))
+
+    # The second line contains the information
+    try:
+        return _disk_quota_percent_used(listquota_output[1])
+    except (TypeError, IndexError):
+        print('{0}: fs listquota did not return expected output: {1}'.format(directory, listquota_output))
+
+
+def read_config(config_fp):
+    config = ConfigParser.SafeConfigParser()
+    config.readfp(config_fp)
+
+    directories = re.split(r'[ ,\n]+', config.get(SECTION, 'directories'))
+    email = re.split(r'[ ,\n]+', config.get(SECTION, 'email'))
+    threshold = config.getfloat(SECTION, 'threshold')
+
+    return directories, email, threshold
+
+
+def main(argv):
+    dry_run = False
+
+    try:
+        optlist, args = getopt.gnu_getopt(argv[1:], 'd:e:hnt:')
+    except getopt.error as err:
+        print(str(err))
+        print(USAGE)
+        return 2
+
+    config_fp = open(args[0], 'r') if len(args) > 0 else StringIO(DEFAULT_CONFIG)
+    directories, email, threshold = read_config(config_fp)
+    config_fp.close()
+
+    for opt, optarg in optlist:
+        if opt == "-d":
+            directories = re.split(r'[ ,]+', optarg)
+        elif opt == "-e":
+            email = re.split(r'[ ,]+', optarg)
+        elif opt == "-h":
+            print(USAGE)
+            return 0
+        elif opt == "-n":
+            dry_run = True
+        elif opt == "-t":
+            threshold = float(optarg)
+
+    msg_text = ""
+    msg_subject = "AFS quota monitor: "
+
+    warning_count = 0
+    for dirpath in directories:
+        disk_usage = get_disk_usage_percent(dirpath)
+        warning_str = ""
+        if disk_usage > threshold:
+            warning_str = " << ABOVE THRESHOLD"
+            warning_count += 1
+        msg_text += "{0:<60} {1:>5.1f}%{2}\n".format(dirpath, disk_usage, warning_str)
+
+    if warning_count > 0:
+        msg_subject += "{0:d} {2} above {1:.1f}%".format(
+            warning_count, threshold, 'dirs' if warning_count > 1 else 'dir')
+    else:
+        msg_subject += "all dirs below {0:.1f}%".format(threshold)
+
+    send_email(email, msg_subject, msg_text, dry_run)
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
+
