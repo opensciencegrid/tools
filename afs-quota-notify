@@ -151,23 +151,56 @@ def main(argv):
         elif opt == "-t":
             threshold = float(optarg)
 
+    if not directories:
+        print("No directories given!", file=sys.stderr)
+        print(USAGE)
+        return 2
+
+    dir_column_width = max([len(d) for d in directories])
+
     msg_text = ""
     msg_subject = "AFS quota monitor: "
 
     warning_count = 0
+    highest = 0.0
+    highest_path = ""
     for dirpath in directories:
         disk_usage = get_disk_usage_percent(dirpath)
         warning_str = ""
+
+        if disk_usage > highest:
+            highest, highest_path = disk_usage, dirpath
+
         if disk_usage > threshold:
             warning_str = " << ABOVE THRESHOLD"
             warning_count += 1
-        msg_text += "{0:<60} {1:>5.1f}%{2}\n".format(dirpath, disk_usage, warning_str)
 
-    if warning_count > 0:
-        msg_subject += "{0:d} {2} above {1:.1f}%".format(
-            warning_count, threshold, 'dirs' if warning_count > 1 else 'dir')
+        # Body text
+        # Examples:
+        # /p/condor/vdt/workspaces  50.0%
+        # /u/m/a/matyas             71.0% << ABOVE THRESHOLD
+        msg_text += "{0:<{width}} {1:>5.1f}%{2}\n".format(
+            dirpath, disk_usage, warning_str, width=dir_column_width)
+
+    # Subject
+    # Examples:
+    # /u/m/a/matyas and 1 other dir are above 40.0%
+    # /u/m/a/matyas is above 70.0%
+    # all dirs are below 90.0%
+    if warning_count > 1:
+        other_dirs = warning_count - 1
+        msg_subject += "{0} and {1:d} other{3} dir{3} are above {2:.1f}%".format(
+            highest_path,
+            other_dirs,
+            threshold,
+            's' if other_dirs > 1 else '')
+
+    elif warning_count == 1:
+        msg_subject += "{0} is above {1:.1f}%".format(highest_path, threshold)
+
     else:
-        msg_subject += "all dirs below {0:.1f}%".format(threshold)
+        msg_subject += "all dirs are below {0:.1f}%".format(threshold)
+
 
     send_email(email, msg_subject, msg_text, dry_run)
 
