@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Simple 'watchdog' script for GitHub AFS backups:
+# sends the time of the last successful update and any NO_FETCH files
+# in an email.
+
+bakdir=/p/condor/workspaces/vdt/git
+
+email_from=`whoami`@cs.wisc.edu
+email_to="matyas+cron@cs.wisc.edu"
+
+subject="GitHub AFS backups watchdog"
+
+cd $bakdir
+
+# Build the body of the email
+{
+    echo -n "Last successful fetch: "
+    if [ -f last-success-mtime ]; then
+        date --date=@`stat --format %Y last-success-mtime`
+    else
+        echo "unknown or never"
+    fi
+
+    for repo in ./*.git; do
+        if [ -f $repo/NO_FETCH ]; then
+            echo "NO_FETCH found in repo `basename $repo`"
+            if [ -s $repo/NO_FETCH ]; then
+                echo "Contents:"
+                cat $repo/NO_FETCH
+                echo
+            fi
+        fi
+    done
+} | mailx -s "$subject" -r "$email_from" $email_to
