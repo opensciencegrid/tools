@@ -1,0 +1,30 @@
+
+The following commands are run from: /p/vdt/workspace/git/<project>.git
+
+Recovering from...
+
+* a non-ff head (branch) update:
+
+  To keep the non-ff update from github:
+
+      git fetch -f origin           # for all branches
+      git fetch -f origin <branch>  # for just one
+
+  To revert the github branch back to uw-afs:
+
+      git push --mirror origin     # for all refs
+      git push -f origin <branch>  # for just one branch
+
+* a tag update:
+
+  To keep the tag update from github:
+
+      # truncate the tag's reflog:
+      
+      > logs/refs/tags/<tag>
+
+  To revert the github tag back to uw-afs:
+
+      git push --mirror origin     # for all refs
+      git push -f origin tag <tag> # for just one tag
+
