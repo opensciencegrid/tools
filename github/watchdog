@@ -7,7 +7,7 @@
 bakdir=/p/condor/workspaces/vdt/git
 
 email_from=`whoami`@cs.wisc.edu
-email_to="matyas+cron@cs.wisc.edu"
+email_to="matyas+cron@cs.wisc.edu edquist@cs.wisc.edu"
 
 subject="GitHub AFS backups watchdog"
 
