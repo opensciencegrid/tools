@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Snapshot script for GitHub AFS backups:
+# creates a consistent copy of each repo, which can then be safely backed
+# up by AFS backups.
+
+
+rootdir=/p/condor/workspaces/vdt/git
+repodir=${rootdir}/repo
+snapshotdir=${rootdir}/snapshot
+logfile=${rootdir}/log/afssnapshot.log
+
+shopt -s failglob # fail if a glob doesn't match anything
+for projectdir in ${repodir}/*.git; do
+(
+    set -e
+    echo "$(date): Creating snapshot of ${projectdir}"
+
+    # Strip off the leading directories
+    projectrepo=$(basename "${projectdir}")
+
+    /bin/rm -rf                 "${snapshotdir}/${projectrepo}.tmp"
+    /usr/bin/git clone --mirror "${repodir}/${projectrepo}" \
+                                "${snapshotdir}/${projectrepo}.tmp"
+
+    /bin/rm -rf "${snapshotdir}/${projectrepo}.old"
+    if [[ -e ${snapshotdir}/${projectrepo} ]]; then
+        /bin/mv -f  "${snapshotdir}/${projectrepo}" \
+                    "${snapshotdir}/${projectrepo}.old"
+    fi
+
+    /bin/rm -rf "${snapshotdir}/${projectrepo}"
+    /bin/mv -f  "${snapshotdir}/${projectrepo}.tmp" \
+                "${snapshotdir}/${projectrepo}"
+
+    /bin/rm -rf "${snapshotdir}/${projectrepo}.old"
+    echo "----------------"
+) >> "$logfile" 2>&1
+done
