@@ -13,14 +13,13 @@ path_to_check=${1?"Usage: $0 <path to check>"}
 # r22629 | matyas | 2016-03-09 11:12:40 -0600 (Wed, 09 Mar 2016)
 # ------------------------------------------------------------------------
 
-# For the lines with data on them, the username is the 3rd field.
-# The separator lines have no 3rd field, so awk will return a blank line.
-# Filter those out, then sort the output, get a count of each unique
-# username, and sort again, numerically (-n), reversed (-r).
+# Filter out the lines with data on them, then get the usernames.
+# Get a count of each unique username, and sort again, numerically (-n),
+# reversed (-r).
 
 svn log -q --use-merge-history "$path_to_check" |
-    awk '{print $3}' |
-    grep -v '^$' |
+    fgrep ' | ' |
+    awk -F' \\| ' '{print $2}' |
     sort |
     uniq -c |
     sort -nr
