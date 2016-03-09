@@ -4,14 +4,15 @@
 # sends the time of the last successful update and any NO_FETCH files
 # in an email.
 
-bakdir=/p/condor/workspaces/vdt/git
+rootdir=/p/condor/workspaces/vdt/git
+repodir=${rootdir}/repo
 
 email_from=`whoami`@cs.wisc.edu
 email_to="matyas+cron@cs.wisc.edu edquist@cs.wisc.edu"
 
 subject="GitHub AFS backups watchdog"
 
-cd $bakdir
+cd $repodir
 
 # Build the body of the email
 {
