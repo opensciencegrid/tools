@@ -1,4 +1,4 @@
-/p/condor/workspaces/vdt/git/backups.log {
+/p/condor/workspaces/vdt/git/log/backups.log {
     rotate 1
     size 10M
     missingok

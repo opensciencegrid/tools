@@ -1,6 +1,9 @@
 #!/bin/bash
 
-bakdir=/p/condor/workspaces/vdt/git
+topdir=/p/condor/workspaces/vdt/git
+bakdir=$topdir/repo
+logdir=$topdir/log
+srcdir=$topdir/script
 
 # list file of git clone urls, path can be absolute or relative to bakdir
 git_remotes_listfile=remotes.list
@@ -99,7 +102,7 @@ fi
 echo ---
 } &>$tmpd/backups.log
 
-cat $tmpd/backups.log >> backups.log
+cat $tmpd/backups.log >> $logdir/backups.log
 
 if [[ -e $tmpd/failures-detected ]]; then
     if [[ -t 1 ]]; then
@@ -118,5 +121,5 @@ else
     touch last-success-mtime
 fi
 
-/usr/sbin/logrotate --state $bakdir/.logrotate.state $bakdir/backups.logrotate
+/usr/sbin/logrotate --state $logdir/.logrotate.state $srcdir/backups.logrotate
 
