@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Display all the usernames of SVN committers of a path, sorted by number of
+# commits.
+
+set -eu
+set -o pipefail
+
+path_to_check=${1?"Usage: $0 <path to check>"}
+
+# svn log -q gives us output like:
+# ------------------------------------------------------------------------
+# r22629 | matyas | 2016-03-09 11:12:40 -0600 (Wed, 09 Mar 2016)
+# ------------------------------------------------------------------------
+
+# For the lines with data on them, the username is the 3rd field.
+# The separator lines have no 3rd field, so awk will return a blank line.
+# Filter those out, then sort the output, get a count of each unique
+# username, and sort again, numerically (-n), reversed (-r).
+
+svn log -q --use-merge-history "$path_to_check" |
+    awk '{print $3}' |
+    grep -v '^$' |
+    sort |
+    uniq -c |
+    sort -nr
