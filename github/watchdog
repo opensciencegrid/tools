@@ -1,8 +1,9 @@
 #!/bin/sh
 
 # Simple 'watchdog' script for GitHub AFS backups:
-# sends the time of the last successful update and any NO_FETCH files
-# in an email.
+# Sends an email containing, for each repo:
+# - the last successful fetch time
+# - whether a NO_FETCH file is present
 
 rootdir=/p/condor/workspaces/vdt/git
 repodir=${rootdir}/repo
@@ -12,25 +13,35 @@ email_to="matyas+cron@cs.wisc.edu edquist@cs.wisc.edu"
 
 subject="GitHub AFS backups watchdog"
 
+pretty_mtime() {
+    # Pretty-print the mtime of a file
+    date --date=@`stat --format %Y "$1"`
+}
+
 cd $repodir
+
+fmtstr='%-30s %-32s %s\n'
 
 # Build the body of the email
 {
-    echo -n "Last successful fetch: "
-    if [ -f last-success-mtime ]; then
-        date --date=@`stat --format %Y last-success-mtime`
-    else
-        echo "unknown or never"
-    fi
+    printf "$fmtstr" "Repo directory" "Last successful fetch" "NO_FETCH file"
+    printf "$fmtstr" "--------------" "---------------------" "-------------"
 
     for repo in ./*.git; do
-        if [ -f $repo/NO_FETCH ]; then
-            echo "NO_FETCH found in repo `basename $repo`"
-            if [ -s $repo/NO_FETCH ]; then
-                echo "Contents:"
-                cat $repo/NO_FETCH
-                echo
-            fi
+        repo_directory=`basename $repo`
+
+        if [ -f $repo/last-success-mtime ]; then
+            last_successful_fetch=`pretty_mtime $repo/last-success-mtime`
+        else
+            last_successful_fetch="UNKNOWN"
         fi
+
+        if [ -f $repo/NO_FETCH ]; then
+            no_fetch_file=YES
+        else
+            no_fetch_file=''
+        fi
+
+        printf "$fmtstr" "$repo_directory" "$last_successful_fetch" "$no_fetch_file"
     done
 } | mailx -s "$subject" -r "$email_from" $email_to

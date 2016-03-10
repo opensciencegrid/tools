@@ -33,6 +33,7 @@ safebakrepo () {
     cd "$repo"
     git fetch
     safetags
+    touch last-success-mtime
   )
 }
 
