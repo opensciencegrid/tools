@@ -3,10 +3,43 @@
 # Display all the usernames of SVN committers of a path, sorted by number of
 # commits.
 
+revision=
+limit=
+use_merge_history=true
+
+while getopts :r:l:G OPT; do
+    case $OPT in
+        r)
+            revision="$OPTARG"
+            ;;
+        l)
+            limit="$OPTARG"
+            ;;
+        G)
+            use_merge_history=false
+            ;;
+        *)
+            echo "usage: ${0##*/} [<options>] [--] [<path to check>]"
+            echo
+            echo "Options:"
+            echo " -G               don't use merge history"
+            echo " -l ARG           max number of commits to display"
+            echo " -r ARG1:ARG2     revision range (from ARG1 to ARG2)"
+            exit 2
+    esac
+done
+shift $(( OPTIND - 1 ))
+OPTIND=1
+
 set -eu
 set -o pipefail
 
-path_to_check=${1?"Usage: $0 <path to check>"}
+path_to_check=${1:-.}
+
+opts=(-q)
+$use_merge_history  &&  opts+=(--use-merge-history)
+[[ -n $revision ]]  &&  opts+=(--revision $revision)
+[[ -n $limit    ]]  &&  opts+=(--limit $limit)
 
 # svn log -q gives us output like:
 # ------------------------------------------------------------------------
@@ -17,7 +50,7 @@ path_to_check=${1?"Usage: $0 <path to check>"}
 # Get a count of each unique username, and sort again, numerically (-n),
 # reversed (-r).
 
-svn log -q --use-merge-history "$path_to_check" |
+svn log "${opts[@]}" "$path_to_check" |
     fgrep ' | ' |
     awk -F' \\| ' '{print $2}' |
     sort |
