@@ -19,9 +19,9 @@ for projectdir in ${repodir}/*.git; do
     # Strip off the leading directories
     projectrepo=$(basename "${projectdir}")
 
-    /bin/rm -rf                 "${snapshotdir}/${projectrepo}.tmp"
-    /usr/bin/git clone --mirror "${repodir}/${projectrepo}" \
-                                "${snapshotdir}/${projectrepo}.tmp"
+    /bin/rm -rf                                "${snapshotdir}/${projectrepo}.tmp"
+    /usr/bin/git clone --no-hardlinks --mirror "${repodir}/${projectrepo}" \
+                                               "${snapshotdir}/${projectrepo}.tmp"
 
     /bin/rm -rf "${snapshotdir}/${projectrepo}.old"
     if [[ -e ${snapshotdir}/${projectrepo} ]]; then
