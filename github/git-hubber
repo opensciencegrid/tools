@@ -1,0 +1,306 @@
+#!/usr/bin/python
+
+import os
+import re
+import sys
+import json
+import getopt
+import getpass
+import urllib2
+import operator
+import subprocess
+
+def usage(msg=None):
+    if msg:
+        print >>sys.stderr, msg + "\n"
+
+    s = os.path.basename(__file__)
+    print """\
+usage: [PASS=...] %s [-u USER[:PASS]] [-d passfd] [-H] COMMAND [args...]
+
+COMMANDs:
+
+  (*)   list-mine
+        list-user        USER
+        list-org         ORG
+        dump-user        USER
+        dump-org         ORG
+        list-branches    OWNER REPO
+        list-tags        OWNER REPO
+        list-refs        OWNER REPO
+  (*)   create-mine      REPO
+  (*)   create-org       ORG   REPO
+  (*)   delete           OWNER REPO
+  (*)   rename           OWNER REPO NEWNAME
+  (*)   set-description  OWNER REPO DESCRIPTION
+  (*)   protect-branch   OWNER REPO BRANCH
+  (*)   unprotect-branch OWNER REPO BRANCH
+        
+(*) USER login required
+
+PASS for USER is taken from the first of:
+  1. -u USER:PASS
+  2. -d passfd (read from fd)
+  3. read from $PASS env var
+  4. read from terminal
+
+Options:
+  -H   show http response headers
+  -F field[:field...] display fields for repos instead of just "html_url"
+     (valid fields are clone_url git_url html_url ssh_url full_name name)
+""" % s
+    sys.exit()
+
+apiurl = 'https://api.github.com'
+
+GET    = 'GET'
+POST   = 'POST'
+PATCH  = 'PATCH'
+DELETE = 'DELETE'
+
+VALID_FIELDS = set('clone_url git_url html_url ssh_url full_name name'.split())
+
+class Options:
+    authstr = None
+    show_headers = False
+    listfields = ['html_url']
+
+options = Options()
+
+def add_gh_preview_header(req):
+    req.add_header("Accept", "application/vnd.github.loki-preview+json")
+
+def add_auth_header(req):
+    if options.authstr:
+        req.add_header("Authorization", "Basic %s" % options.authstr)
+
+def authsetup(user, passwd):
+    from base64 import encodestring
+    options.authstr = encodestring('%s:%s' % (user,passwd)).replace('\n', '')
+
+def getpw(user, passfd=None):
+    if ':' in user:
+        user, pw = user.split(':', 1)
+    elif passfd is not None:
+        pw = os.fdopen(passfd).readline().rstrip('\n')
+    elif 'PASS' in os.environ:
+        pw = os.environ['PASS']
+    else:
+        pw = getpass.getpass('passwd for user %s: ' % user)
+    return user, pw
+
+def linkparse(linktext):
+    mm = re.findall(r'<([^>]+)>;\s*rel="([^"]+)"', linktext)
+    return dict((page, rel) for rel,page in mm)
+
+def get_nextlink(resp):
+    linktext = resp.headers.getheader('link')
+    if linktext:
+        links = linkparse(linktext)
+        if 'next' in links:
+            return links['next']
+
+def _snarfer(method, url, data=None):
+    req = urllib2.Request(url, data)
+    add_auth_header(req)
+    add_gh_preview_header(req)
+    req.get_method = lambda : method
+    resp = urllib2.urlopen(req)
+    if options.show_headers:
+        print "Headers for <%s>" % url
+        print "---"
+        print resp.headers
+    nextlink = get_nextlink(resp)
+    return resp.read(), nextlink
+
+def snarfergen(method, url, data=None):
+    while url:
+        text, url = _snarfer(method, url, data)
+        if text:
+            j = json.loads(text)
+            if type(j) is dict:
+                pmsg(j)
+            yield j
+    
+def snarfer(method, path, data=None):
+    if data:
+        data = json.dumps(data)
+    url = apiurl + path
+    outs = list(snarfergen(method, url, data))
+    nresp = len(outs)
+    if nresp == 0:
+        return None
+    elif nresp == 1:
+        return outs[0]
+    elif type(outs[0]) is list:
+        return reduce(operator.add, outs)
+    else:
+        return outs
+
+"""
+github API notes:
+
+: list-mine      GET /user/repos
+: list-user      GET /users/:username/repos
+: list-org       GET /orgs/:org/repos
+: list-branches  GET /repos/:owner/:repo/branches
+: list-tags      GET /repos/:owner/:repo/tags
+: list-refs      GET /repos/:owner/:repo/git/refs  # aka git_refs_url
+: create-mine    POST /user/repos      {"name": "Repo-Name"}
+: create-org     POST /orgs/:org/repos {"name": "Repo-Name"}
+: delete         DELETE /repos/:owner/:repo
+: rename (edit)  PATCH /repos/:owner/:repo  {"name": "New-Repo-Name"}
+: protect-branch PATCH /repos/:owner/:repo/branches/:branch {"enabled": "true"}
+"""
+
+def print_names(seq):
+    m = max( len(x['name']) for x in seq )
+    for x in seq:
+        print "%-*s  %s" % (m, x['name'], x['html_url'])
+
+def print_fields(seq):
+    rows = sorted( [ x[f] for f in options.listfields ] for x in seq )
+    for row in rows:
+        print '\t'.join(row)
+
+def print_refs(seq):
+    for x in seq:
+        print x["commit"]["sha"], x["name"]
+
+def print_git_refs(seq):
+    for x in seq:
+        print x["object"]["sha"], x["ref"]
+
+def dump_infos(seq):
+    for x in seq:
+        print x['html_url']
+        w = max(len(xx) for xx in x)
+        for xk,xv in sorted(x.items()):
+            print "  - %*s: %s" % (w,xk,xv)
+        print
+
+def pmsg(j):
+    if j and 'message' in j:
+        print j['message']
+
+def list_mine():
+    print_fields(snarfer(GET, '/user/repos'))
+
+def list_user(username):
+    print_fields(snarfer(GET, '/users/%s/repos' % username))
+
+def list_org(org):
+    print_fields(snarfer(GET, '/orgs/%s/repos' % org))
+
+def list_branches(owner, repo):
+    print_refs(snarfer(GET, '/repos/%s/%s/branches' % (owner,repo)))
+
+def list_tags(owner, repo):
+    print_refs(snarfer(GET, '/repos/%s/%s/tags' % (owner,repo)))
+
+def list_git_refs(owner, repo):
+    print_git_refs(snarfer(GET, '/repos/%s/%s/git/refs' % (owner,repo)))
+
+def dump_user(username):
+    dump_infos(snarfer(GET, '/users/%s/repos' % username))
+
+def dump_org(org):
+    dump_infos(snarfer(GET, '/orgs/%s/repos' % org))
+
+def create_mine(repo):
+    snarfer(POST, '/user/repos', {"name": repo})
+
+def create_org(org, repo):
+    snarfer(POST, '/orgs/%s/repos' % org, {"name": repo})
+
+def delete_repo(owner, repo):
+    snarfer(DELETE, '/repos/%s/%s' % (owner,repo))
+
+def rename_repo(owner, repo, newname):
+    snarfer(PATCH, '/repos/%s/%s' % (owner,repo), {"name": newname})
+
+def set_description(owner, repo, desc):
+    snarfer(PATCH, '/repos/%s/%s' % (owner,repo),
+           {"name": repo, "description": desc})
+
+def protect_branch(owner, repo, branch):
+    snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
+           { "protection": {
+               "enabled": True,
+               "required_status_checks": {
+                   "enforcement_level": "everyone",  # or "non_admins", or "off"
+                   "contexts": []  # eg, "continuous-integration/travis-ci"
+               }
+             }
+           })
+
+def unprotect_branch(owner, repo, branch):
+    snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
+           {"protection": {"enabled": False}})
+
+methods = {
+    'list-mine':        [list_mine,        0, True],
+    'list-user':        [list_user,        1, False],
+    'list-org':         [list_org,         1, False],
+    'dump-user':        [dump_user,        1, False],
+    'dump-org':         [dump_org,         1, False],
+    'list-branches':    [list_branches,    2, False],
+    'list-tags':        [list_tags,        2, False],
+    'list-refs':        [list_git_refs,    2, False],
+    'create-mine':      [create_mine,      1, True],
+    'create-org':       [create_org,       2, True],
+    'delete':           [delete_repo,      2, True],
+    'rename':           [rename_repo,      3, True],
+    'set-description':  [set_description,  3, True],
+    'protect-branch':   [protect_branch,   3, True],
+    'unprotect-branch': [unprotect_branch, 3, True]
+}
+
+def checkfields(f):
+    if not f:
+        usage()
+    fields = f.split(':')
+    if not all( x in VALID_FIELDS for x in fields ):
+        usage()
+    return fields
+
+def main(args):
+    ops, args = getopt.getopt(args, 'u:d:HF:')
+    ops = dict(ops)
+    if len(args) < 1:
+        usage()
+
+    user   = None
+    passfd = None
+
+    if '-u' in ops: user   =     ops['-u']
+    if '-d' in ops: passfd = int(ops['-d'])
+    if '-H' in ops: options.show_headers = True
+    if '-F' in ops: options.listfields = checkfields(ops['-F'])
+
+    command = args[0]
+    args = args[1:]
+
+    if command not in methods:
+        usage("unrecognized command: '%s'" % command)
+
+    method, ex_args, user_required = methods[command]
+
+    if len(args) != ex_args:
+        usage("wrong number of args for %s command" % command)
+
+    if user:
+        user, passwd = getpw(user, passfd)
+        authsetup(user, passwd)
+    elif user_required:
+        usage("USER required for %s command" % command)
+
+    method(*args)
+
+if __name__ == '__main__':
+    try:
+        main(sys.argv[1:])
+    except urllib2.HTTPError as e:
+        print >>sys.stderr, e
+        sys.exit(1)
+
