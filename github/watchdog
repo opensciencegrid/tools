@@ -15,7 +15,7 @@ subject="GitHub AFS backups watchdog"
 
 pretty_mtime() {
     # Pretty-print the mtime of a file
-    date +'%a %x %X' --date=@`stat --format %Y "$1"`
+    date +'%a %x %X' -r "$1"
 }
 
 cd $repodir
