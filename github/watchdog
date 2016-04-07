@@ -15,12 +15,12 @@ subject="GitHub AFS backups watchdog"
 
 pretty_mtime() {
     # Pretty-print the mtime of a file
-    date --date=@`stat --format %Y "$1"`
+    date +'%a %x %X' --date=@`stat --format %Y "$1"`
 }
 
 cd $repodir
 
-fmtstr='%-30s %-32s %s\n'
+fmtstr='%-35s %-22s %s\n'
 
 # Build the body of the email
 {
