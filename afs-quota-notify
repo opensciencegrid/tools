@@ -13,11 +13,7 @@ import subprocess
 import ConfigParser
 from StringIO import StringIO
 
-# Pylint import checks don't handle conditional imports well
-try:
-    from email.mime.text import MIMEText # Python 2.6; pylint: disable=F0401,E0611
-except ImportError:
-    from email.MIMEText import MIMEText # Python 2.4; pylint: disable=F0401,E0611
+from email.mime.text import MIMEText
 
 SCRIPT_NAME = 'afs-quota-notify'
 SECTION = 'afs-quota-notify'
