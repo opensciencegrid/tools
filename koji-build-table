@@ -11,7 +11,7 @@ import sys
 
 from optparse import OptionParser
 
-KOJI_WEB = "https://koji-hub.batlab.org"
+KOJI_WEB = "https://koji.chtc.wisc.edu"
 
 def get_args(argv):
     usage = """\
