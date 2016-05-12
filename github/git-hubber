@@ -30,6 +30,7 @@ COMMANDs:
         list-refs        OWNER REPO
   (*)   create-mine      REPO
   (*)   create-org       ORG   REPO
+  (*)   fork-from        OWNER REPO
   (*)   delete           OWNER REPO
   (*)   rename           OWNER REPO NEWNAME
   (*)   set-description  OWNER REPO DESCRIPTION
@@ -213,6 +214,9 @@ def create_mine(repo):
 def create_org(org, repo):
     snarfer(POST, '/orgs/%s/repos' % org, {"name": repo})
 
+def fork_mine(owner, repo):
+    snarfer(POST, '/repos/%s/%s/forks' % (owner,repo))
+
 def delete_repo(owner, repo):
     snarfer(DELETE, '/repos/%s/%s' % (owner,repo))
 
@@ -249,6 +253,7 @@ methods = {
     'list-refs':        [list_git_refs,    2, False],
     'create-mine':      [create_mine,      1, True],
     'create-org':       [create_org,       2, True],
+    'fork-from':        [fork_mine,        2, True],
     'delete':           [delete_repo,      2, True],
     'rename':           [rename_repo,      3, True],
     'set-description':  [set_description,  3, True],
