@@ -11,7 +11,12 @@ repodir=${rootdir}/repo
 email_from=`whoami`@cs.wisc.edu
 email_to="matyas+cron@cs.wisc.edu edquist@cs.wisc.edu"
 
-subject="GitHub AFS backups watchdog"
+subject_ok="GitHub AFS backups: all fetches OK"
+subject_bad="GitHub AFS backups: some fetches failed"
+subject_nofetch="GitHub AFS backups: some fetches skipped"
+
+# fetch starts every 10 minutes (600 sec) and typically takes up to 20 sec
+timestamp_threshold=580
 
 pretty_mtime() {
     # Pretty-print the mtime of a file
@@ -22,7 +27,14 @@ cd $repodir
 
 fmtstr='%-35s %-22s %s\n'
 
-# Build the body of the email
+# Build the body of the email and collect min/max timestamp
+min_timestamp=$((1 << 32))
+max_timestamp=0
+have_nofetches=false
+
+message_file=`mktemp`
+trap "rm -f $message_file" EXIT
+
 {
     printf "$fmtstr" "Repo directory" "Last successful fetch" "NO_FETCH file"
     printf "$fmtstr" "--------------" "---------------------" "-------------"
@@ -38,10 +50,33 @@ fmtstr='%-35s %-22s %s\n'
 
         if [ -f $repo/NO_FETCH ]; then
             no_fetch_file=YES
+            have_nofetches=true
         else
             no_fetch_file=''
+
+            if [ -f $repo/last-success-mtime ]; then
+                mtime=`stat --format %Y $repo/last-success-mtime`
+                if [ $min_timestamp -gt $mtime ]; then
+                    min_timestamp=$mtime
+                elif [ $max_timestamp -lt $mtime ]; then
+                    max_timestamp=$mtime
+                fi
+            fi
         fi
 
         printf "$fmtstr" "$repo_directory" "$last_successful_fetch" "$no_fetch_file"
     done
-} | mailx -s "$subject" -r "$email_from" $email_to
+} > $message_file
+
+if [ $(( $max_timestamp - $min_timestamp )) -gt $timestamp_threshold ]; then
+    subject=$subject_bad
+elif $have_nofetches; then
+    subject=$subject_nofetch
+else
+    subject=$subject_ok
+fi
+
+mailx -s "$subject" -r "$email_from" $email_to < $message_file
+
+rm -f "$message_file"
+
