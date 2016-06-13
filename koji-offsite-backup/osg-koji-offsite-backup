@@ -15,7 +15,6 @@ RETRY_WAIT              = 60
 NOTIFY_EMAILS           = [x + '@cs.wisc.edu' for x in ['blin', 'cat', 'edquist', 'matyas', 'tim']]
 KEY                     = '/root/osg_backup_key'
 BACKUP_TIME_OFFSET      = 86400     # 1 day
-LAST_BACKUP_TIME_OFFSET = 86400 * 8 # 1 week + 1 day
 
 DEDUPE_SCRIPT           = "%s/dedupe" % REMOTE_BASE_PATH
 REMOTE_LOGIN_HOST       = "%s@%s" % (REMOTE_LOGIN, REMOTE_HOST)
@@ -197,7 +196,8 @@ def backup_packages_with_dedupe(remote_path, remote_link_path, dedupe_pattern, d
 
         rsync_with_retry(package_dir, remote_package_dir, link=remote_link_dir)
 
-        dedupe(pattern=dedupe_pattern, substitution=dedupe_substitution, from_dirs=[remote_package_dir], logfile=dedupe_logfile)
+        if dedupe_pattern and dedupe_substitution:
+            dedupe(pattern=dedupe_pattern, substitution=dedupe_substitution, from_dirs=[remote_package_dir], logfile=dedupe_logfile)
 
 
 def get_backup_statistics(remote_path):
@@ -218,6 +218,25 @@ Disk free:
         return None
 
 
+def get_previous_remote_backup_date(current_backup_date):
+    """Return the most recent backup date on the remote side that is older than
+    current_backup_date"""
+
+    # return dirs in reverse sorted order
+    # dates are in YYYY-mm-dd format so they sort
+    ret, backup_dirs = remote_run_command('cd %s; ls -dr */' % REMOTE_BASE_PATH)
+    if ret != 0:
+        return None
+
+    date_re = re.compile('20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]')
+
+    backup_dates = [x.rstrip('/') for x in backup_dirs.split('\n') if date_re.match(x)]
+    for date in backup_dates:
+        if date < current_backup_date:
+            return date
+    else:
+        return None
+
 
 def main(argv):
     try:
@@ -225,7 +244,7 @@ def main(argv):
             raise Error('dedupe script missing from remote side')
 
         backup_date = time.strftime("%Y-%m-%d", time.localtime(time.time() - BACKUP_TIME_OFFSET))
-        last_backup_date = time.strftime("%Y-%m-%d", time.localtime(time.time() - LAST_BACKUP_TIME_OFFSET))
+        last_backup_date = get_previous_remote_backup_date(backup_date)
 
         tempdir = tempfile.mkdtemp(prefix='osg-koji-backup')
         try:
