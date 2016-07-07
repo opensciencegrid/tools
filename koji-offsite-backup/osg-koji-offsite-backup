@@ -14,7 +14,6 @@ RETRIES                 = 10
 RETRY_WAIT              = 60
 NOTIFY_EMAILS           = [x + '@cs.wisc.edu' for x in ['blin', 'cat', 'edquist', 'matyas', 'tim']]
 KEY                     = '/root/osg_backup_key'
-BACKUP_TIME_OFFSET      = 86400     # 1 day
 
 DEDUPE_SCRIPT           = "%s/dedupe" % REMOTE_BASE_PATH
 REMOTE_LOGIN_HOST       = "%s@%s" % (REMOTE_LOGIN, REMOTE_HOST)
@@ -192,7 +191,9 @@ def backup_packages_with_dedupe(remote_path, remote_link_path, dedupe_pattern, d
     for package in os.listdir(packages_dir):
         package_dir = os.path.join(packages_dir, package)
         remote_package_dir = os.path.join(remote_path, 'packages', package)
-        remote_link_dir = os.path.join(remote_link_path, 'packages', package)
+        remote_link_dir = None
+        if remote_link_path:
+            remote_link_dir = os.path.join(remote_link_path, 'packages', package)
 
         rsync_with_retry(package_dir, remote_package_dir, link=remote_link_dir)
 
@@ -224,13 +225,12 @@ def get_previous_remote_backup_date(current_backup_date):
 
     # return dirs in reverse sorted order
     # dates are in YYYY-mm-dd format so they sort
-    ret, backup_dirs = remote_run_command('cd %s; ls -dr */' % REMOTE_BASE_PATH)
+    ret, backup_dirs = remote_run_command('cd "%s" && ls -dr 20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]/' % REMOTE_BASE_PATH)
     if ret != 0:
         return None
 
-    date_re = re.compile('20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]')
-
-    backup_dates = [x.rstrip('/') for x in backup_dirs.split('\n') if date_re.match(x)]
+    backup_dirs = backup_dirs.strip()
+    backup_dates = [x.rstrip('/') for x in backup_dirs.split('\n') if x]
     for date in backup_dates:
         if date < current_backup_date:
             return date
@@ -238,12 +238,37 @@ def get_previous_remote_backup_date(current_backup_date):
         return None
 
 
+def get_current_backup_date():
+    """Return the most recent completed backup date"""
+
+    ret, backup_dirs = sbacktick('cd "%s" && ls -dr 20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]/' % LOCAL_BACKUP_ROOT, shell=True)
+
+    if ret != 0:
+        return None
+
+    backup_dirs = backup_dirs.strip()
+    backup_dates = [x.rstrip('/') for x in backup_dirs.split('\n') if x]
+
+    # Look for rsync processes owned by root. These are likely to be processes
+    # doing the original backups. False positives aren't a big deal.
+    ret, _ = sbacktick(["pgrep", "-x", "-u", "root", "rsync"])
+    try:
+        if ret == 0:
+            # rsync still running; most recent is assumed to be incomplete
+            return backup_dates[1]
+        else:
+            # no rsync; most recent is assumed to be complete
+            return backup_dates[0]
+    except IndexError:
+        raise Error("No complete backups found")
+
+
 def main(argv):
     try:
         if remote_run_command('[[ -x %s ]]' % DEDUPE_SCRIPT)[0] != 0:
             raise Error('dedupe script missing from remote side')
 
-        backup_date = time.strftime("%Y-%m-%d", time.localtime(time.time() - BACKUP_TIME_OFFSET))
+        backup_date = get_current_backup_date()
         last_backup_date = get_previous_remote_backup_date(backup_date)
 
         tempdir = tempfile.mkdtemp(prefix='osg-koji-backup')
@@ -252,7 +277,9 @@ def main(argv):
             workdir = os.path.join(tempdir, backup_date)
             yesterdays_backups = os.path.join(LOCAL_BACKUP_ROOT, backup_date)
             remote_path = os.path.join(REMOTE_BASE_PATH, backup_date)
-            remote_link_path = os.path.join(REMOTE_BASE_PATH, last_backup_date)
+            remote_link_path = None
+            if last_backup_date:
+                remote_link_path = os.path.join(REMOTE_BASE_PATH, last_backup_date)
 
             os.makedirs(workdir)
 
