@@ -248,8 +248,10 @@ def get_current_backup_date():
 
     backup_dirs = backup_dirs.strip()
     backup_dates = [x.rstrip('/') for x in backup_dirs.split('\n') if x]
-    ret, _ = sbacktick("ps axw | grep -q [r]sync", shell=True)
 
+    # Look for rsync processes owned by root. These are likely to be processes
+    # doing the original backups. False positives aren't a big deal.
+    ret, _ = sbacktick(["pgrep", "-x", "-u", "root", "rsync"])
     try:
         if ret == 0:
             # rsync still running; most recent is assumed to be incomplete
