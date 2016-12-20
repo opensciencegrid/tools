@@ -1,0 +1,153 @@
+#!/usr/bin/python
+
+"""
+Usage:
+  %s [options] output-001 [packages...]
+
+List version-release numbers for RPMs installed in an osg-test run output
+directory, as found in output-NNN/output/osg-test-*.log
+
+The output argument can also be a root.log from a koji/mock build,
+or the raw output of an 'rpm -qa' command.
+
+If any packages are specified, limit the results to just those packages.
+
+Options:
+  -A, --no-strip-arch  don't attempt to strip .arch from package names
+  -D, --no-strip-dist  don't attempt to strip .dist tag from package releases
+"""
+
+import glob
+import stat
+import sys
+import os
+import re
+
+outdir     = None
+pkgs       = []
+strip_arch = True
+strip_dist = True
+
+arch_pat = r'\.(x86_64|i[3-6]86|noarch|src)$'
+dist_pat = r'((\.osg(\d+)?)?\.[es]l[5-9](_[\d.]+)?(\.centos)?|\.osg|\.fc\d+)$'
+
+def usage():
+    print __doc__ % os.path.basename(__file__)
+    sys.exit()
+
+for arg in sys.argv[1:]:
+    if   arg in ('-A', '--no-strip-arch') : strip_arch = False
+    elif arg in ('-D', '--no-strip-dist') : strip_dist = False
+    elif arg.startswith('-')              : usage()
+    elif outdir is None                   : outdir = arg
+    else                                  : pkgs.append(arg)
+
+if outdir is None:
+    usage()
+
+def arch_strip(na):
+    return re.sub(arch_pat, '', na)
+
+def dist_strip(evr):
+    ev,r = evr.split('-')
+    r = re.sub(dist_pat, '', r)
+    return '-'.join([ev,r])
+
+def nvrgen(items):
+    # generate sequence of ["name.arch", "epoch:version-release"] pairs
+    while items:
+        na, evr = items[:2]
+        if strip_arch:
+            na = arch_strip(na)
+        if strip_dist:
+            evr = dist_strip(evr)
+        if evr.startswith("0:"):
+            evr = evr[2:]
+        yield [na,evr]
+        items[:2] = []
+
+def isdir(fn):
+    try:
+        return stat.S_ISDIR(os.stat(fn).st_mode)
+    except OSError:
+        return False
+
+def rpm_qa2na_vr(line):
+    line = re.sub(r'(\.rpm)?\r?\n?$', '', line)
+    if re.search(arch_pat, line):
+        nvr,a = line.rsplit('.', 1)
+    else:
+        nvr,a = line, None
+    n,v,r = nvr.rsplit('-',2)
+    if a and not strip_arch:
+        na = '.'.join((n,a))
+    else:
+        na = n
+    if strip_dist:
+        r = re.sub(dist_pat, '', r)
+    vr = '-'.join((v,r))
+    return [na,vr]
+
+def nvrmap(output):
+    if not isdir(output):
+        log = output
+    else:
+        globpat = "%s/output/osg-test-*.log" % output
+        log = glob.glob(globpat)
+        if len(log) != 1:
+            print >>sys.stderr, "Error: could not find '%s'" % globpat
+            sys.exit(1)
+        log = log[0]
+
+    # split this way since there can be more than one item per line
+    txt = open(log).read()
+    if ' ' in txt:
+        # strip "DEBUG util.py:388:  " in case this is coming from a root.log
+        txt = re.sub(r'\n[A-Z]+ .*?:\d+:  ', r'\n', txt)
+        # don't include Install list from cleanup/downgrade
+        txt = re.sub(r'\nosgtest: .* special_cleanup[\d\D]*', r'\n', txt)
+        items_pat = (r'^(?:Dependency )?(?:Installed|Updated|Replaced):\n'
+                     r'(.*?)\n(?:\n|(?=[^ ]))')
+        items = ' '.join(re.findall(items_pat, txt, re.S | re.M)).split()
+        return dict(nvrgen(items))
+    else:
+        # at most 1-word per line; assume this is 'rpm -qa' output
+        return dict(map(rpm_qa2na_vr, txt.split()))
+
+def print_table(headercol, table):
+    table = [headercol] + table
+    widths = [ max(map(len,col)) for col in zip(*table) ]
+    table[1:1] = [[ '-' * n for n in widths ]]
+    for i,row in enumerate(table):
+        spacing = [ w-len(x) for x,w in zip(row,widths) ]
+        print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
+
+def single_output(output, pkgs):
+    rpms = nvrmap(output)
+
+    if strip_arch:
+        bare_rpms = set(rpms)
+    else:
+        bare_rpms = set(map(arch_strip, rpms))
+
+    match_rpms = set(pkgs)
+
+    if strip_arch:
+        all_match_rpms = match_rpms
+    else:
+        all_match_rpms = set(x for x in rpms if arch_strip(x) in match_rpms)
+
+    pkg_vrs = []
+    for pkg in sorted(all_match_rpms if pkgs else rpms):
+        vr = rpms.get(pkg) or '-'
+        pkg_vrs.append([pkg, vr])
+
+    print_table(["Package", output], pkg_vrs)
+
+
+def main():
+    single_output(outdir, pkgs)
+
+if __name__ == '__main__':
+    main()
+
