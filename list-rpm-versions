@@ -122,31 +122,34 @@ def print_table(headercol, table):
         spacing = [ w-len(x) for x,w in zip(row,widths) ]
         print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
 
-def single_output(output, pkgs):
+def single_output_pkg_vrs(output, pkgs):
     rpms = nvrmap(output)
 
+    # arch-stripped rpm names
     if strip_arch:
         bare_rpms = set(rpms)
     else:
         bare_rpms = set(map(arch_strip, rpms))
 
     match_rpms = set(pkgs)
+    missing_rpms = match_rpms - bare_rpms
 
     if strip_arch:
         all_match_rpms = match_rpms
     else:
-        all_match_rpms = set(x for x in rpms if arch_strip(x) in match_rpms)
+        all_match_rpms = ( set(x for x in rpms if arch_strip(x) in match_rpms)
+                         | missing_rpms )
 
-    pkg_vrs = []
-    for pkg in sorted(all_match_rpms if pkgs else rpms):
-        vr = rpms.get(pkg) or '-'
-        pkg_vrs.append([pkg, vr])
+    display_pkgs = sorted(all_match_rpms if pkgs else rpms)
 
+    return [ [pkg, rpms.get(pkg, '-')] for pkg in display_pkgs ]
+
+def display_single_output(output, pkgs):
+    pkg_vrs = single_output_pkg_vrs(output, pkgs)
     print_table(["Package", output], pkg_vrs)
 
-
 def main():
-    single_output(outdir, pkgs)
+    display_single_output(outdir, pkgs)
 
 if __name__ == '__main__':
     main()
