@@ -31,7 +31,10 @@ strip_dist = True
 arch_pat = r'\.(x86_64|i[3-6]86|noarch|src)$'
 dist_pat = r'((\.osg(\d+)?)?\.[es]l[5-9](_[\d.]+)?(\.centos)?|\.osg|\.fc\d+)$'
 
-def usage():
+def usage(msg=None):
+    if msg:
+        print msg
+        print
     print __doc__ % os.path.basename(__file__)
     sys.exit()
 
