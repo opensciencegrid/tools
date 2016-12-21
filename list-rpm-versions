@@ -75,6 +75,9 @@ def parseargs():
     outdir = args[0]
     pkgs   = args[1:]
 
+    if max_nums < 0:
+        max_nums = 99999
+
     if summarize and not pkgs:
         usage("Must specify package list for --summarize")
 
