@@ -17,16 +17,21 @@ Options:
   -D, --no-strip-dist  don't attempt to strip .dist tag from package releases
 """
 
+import collections
 import glob
 import stat
 import sys
 import os
 import re
 
+
+GLOBAL_RUNS_DIR = "/osgtest/runs"
+
 outdir     = None
 pkgs       = []
 strip_arch = True
 strip_dist = True
+summarize  = False
 
 arch_pat = r'\.(x86_64|i[3-6]86|noarch|src)$'
 dist_pat = r'((\.osg(\d+)?)?\.[es]l[5-9](_[\d.]+)?(\.centos)?|\.osg|\.fc\d+)$'
@@ -39,16 +44,20 @@ def usage(msg=None):
     sys.exit()
 
 def parseargs():
-    global strip_arch, strip_dist, outdir
+    global strip_arch, strip_dist, outdir, summarize
     for arg in sys.argv[1:]:
         if   arg in ('-A', '--no-strip-arch') : strip_arch = False
         elif arg in ('-D', '--no-strip-dist') : strip_dist = False
+        elif arg in ('-s', '--summarize')     : summarize  = True
         elif arg.startswith('-')              : usage()
         elif outdir is None                   : outdir = arg
         else                                  : pkgs.append(arg)
 
     if outdir is None:
-        usage()
+        usage("Must provide a test run output location")
+
+    if summarize and not pkgs:
+        usage("Must specify package list for --summarize")
 
 def arch_strip(na):
     return re.sub(arch_pat, '', na)
@@ -152,9 +161,57 @@ def display_single_output(output, pkgs):
     pkg_vrs = single_output_pkg_vrs(output, pkgs)
     print_table(["Package", output], pkg_vrs)
 
+class autodict(collections.defaultdict):
+    def __init__(self,*other):
+        collections.defaultdict.__init__(self, self.__class__, *other)
+    def __add__ (self, other):
+        return other
+    def __repr__(self):
+        return '%s(%s)' % (self.__class__.__name__, dict.__repr__(self))
+
+try:
+    import rpm
+    from rpmUtils.miscutils import stringToVersion
+    def rpmvercmp(a,b):
+        return rpm.labelCompare(*[stringToVersion(x) for x in (a,b)])
+except ImportError:
+    rpmvercmp = None
+
+def summarize_outputs(rundir, pkgs):
+    if isdir(rundir):
+        pass  # OK, specified path exists
+    elif re.match(r'run-20[0-9]{6}-[0-9]{4}$', rundir):
+        rundir = "%s/%s" % (GLOBAL_RUNS_DIR, rundir)
+    elif re.match(r'20[0-9]{6}-[0-9]{4}$', rundir):
+        rundir = "%s/run-%s" % (GLOBAL_RUNS_DIR, rundir)
+
+    globpat = "%s/output-[0-9][0-9][0-9]*/" % rundir
+    outputs = glob.glob(globpat)
+
+    if not outputs:
+        raise RuntimeError("no output dirs found under '%s'" % rundir)
+
+    pkgstats = autodict()
+
+    for output in outputs:
+        pkg_vrs = single_output_pkg_vrs(output, pkgs)
+        for pkg,vr in pkg_vrs:
+            pkgstats[pkg][vr] += 1
+
+    pkgstatslist = []
+    for pkg in sorted(pkgstats):
+        for vr in sorted(pkgstats[pkg], cmp=rpmvercmp):
+            pkgstatslist.append([pkg, vr, str(pkgstats[pkg][vr])])
+        pkgstatslist.append(['', '', ''])
+
+    print_table(["Package", "Version-Release", "Count"], pkgstatslist)
+
 def main():
     parseargs()
-    display_single_output(outdir, pkgs)
+    if summarize:
+        summarize_outputs(outdir, pkgs)
+    else:
+        display_single_output(outdir, pkgs)
 
 if __name__ == '__main__':
     try:
