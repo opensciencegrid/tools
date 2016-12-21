@@ -50,8 +50,7 @@ dist_pat = r'((\.osg(\d+)?)?\.[es]l[5-9](_[\d.]+)?(\.centos)?|\.osg|\.fc\d+)$'
 
 def usage(msg=None):
     if msg:
-        print msg
-        print
+        print "***", msg, "***"
     print __doc__ % {"script": os.path.basename(__file__)}
     sys.exit()
 
@@ -227,7 +226,6 @@ def get_run_output_dirs(rundir):
 
     return outputs
 
-
 def summarize_outputs(rundir, pkgs):
     outputs = get_run_output_dirs(rundir)
 
@@ -263,8 +261,8 @@ if __name__ == '__main__':
     try:
         main()
     except RuntimeError as e:
-        print >>sys.stderr, "Error: %s" % e.message
+        print >>sys.stderr, "Error: %s" % e
         sys.exit(1)
     except getopt.GetoptError as e:
-        usage(e.msg)
+        usage(e)
 
