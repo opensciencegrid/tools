@@ -232,18 +232,16 @@ def summarize_outputs(rundir, pkgs):
     for output in outputs:
         pkg_vrs = single_output_pkg_vrs(output, pkgs)
         for pkg,vr in pkg_vrs:
-            pkgstats[pkg][vr]["count"] += 1
-            if list_nums:
-                pkgstats[pkg][vr]["outputs"] += [outputnum(output)]
+            pkgstats[pkg][vr] += [outputnum(output)]
 
     header = get_summary_header()
     pkgstatslist = []
     for pkg in sorted(pkgstats):
         for vr in sorted(pkgstats[pkg], cmp=rpmvercmp):
-            row = [pkg, vr, str(pkgstats[pkg][vr]["count"])]
+            row = [pkg, vr, str(len(pkgstats[pkg][vr]))]
             if list_nums:
-                nums_str =','.join(pkgstats[pkg][vr]["outputs"][:max_nums])
-                if len(pkgstats[pkg][vr]["outputs"]) > max_nums:
+                nums_str =','.join(pkgstats[pkg][vr][:max_nums])
+                if len(pkgstats[pkg][vr]) > max_nums:
                     nums_str += ",..."
                 row.append(nums_str)
             pkgstatslist.append(row)
