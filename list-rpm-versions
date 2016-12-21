@@ -2,7 +2,8 @@
 
 """
 Usage:
-  %s [options] output-001 [packages...]
+  %(script)s [options] output-001 [packages...]
+  %(script)s [options] --summarize [run-]20161220-1618 packages...
 
 List version-release numbers for RPMs installed in an osg-test run output
 directory, as found in output-NNN/output/osg-test-*.log
@@ -12,9 +13,14 @@ or the raw output of an 'rpm -qa' command.
 
 If any packages are specified, limit the results to just those packages.
 
+If a run directory (or, just the timstamp string) is specified, summary
+information will be printed for the listed packages across all output-NNN
+subdirectories for that set of osg test runs.
+
 Options:
   -A, --no-strip-arch  don't attempt to strip .arch from package names
   -D, --no-strip-dist  don't attempt to strip .dist tag from package releases
+  -s, --summarize      summarize results for all output subdirs
 """
 
 import collections
@@ -40,7 +46,7 @@ def usage(msg=None):
     if msg:
         print msg
         print
-    print __doc__ % os.path.basename(__file__)
+    print __doc__ % {"script": os.path.basename(__file__)}
     sys.exit()
 
 def parseargs():
