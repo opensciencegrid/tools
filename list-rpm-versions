@@ -35,15 +35,17 @@ def usage():
     print __doc__ % os.path.basename(__file__)
     sys.exit()
 
-for arg in sys.argv[1:]:
-    if   arg in ('-A', '--no-strip-arch') : strip_arch = False
-    elif arg in ('-D', '--no-strip-dist') : strip_dist = False
-    elif arg.startswith('-')              : usage()
-    elif outdir is None                   : outdir = arg
-    else                                  : pkgs.append(arg)
+def parseargs():
+    global strip_arch, strip_dist, outdir
+    for arg in sys.argv[1:]:
+        if   arg in ('-A', '--no-strip-arch') : strip_arch = False
+        elif arg in ('-D', '--no-strip-dist') : strip_dist = False
+        elif arg.startswith('-')              : usage()
+        elif outdir is None                   : outdir = arg
+        else                                  : pkgs.append(arg)
 
-if outdir is None:
-    usage()
+    if outdir is None:
+        usage()
 
 def arch_strip(na):
     return re.sub(arch_pat, '', na)
@@ -149,6 +151,7 @@ def display_single_output(output, pkgs):
     print_table(["Package", output], pkg_vrs)
 
 def main():
+    parseargs()
     display_single_output(outdir, pkgs)
 
 if __name__ == '__main__':
