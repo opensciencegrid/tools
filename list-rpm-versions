@@ -23,9 +23,11 @@ Options:
 
   -s, --summarize      summarize results for all output subdirs
   -l, --list-outputs   list output numbers (summarize mode only)
+  -L, --max-outputs N  list at most N output numbers per NVR (-1 for unlimited)
 """
 
 import collections
+import getopt
 import glob
 import stat
 import sys
@@ -54,18 +56,24 @@ def usage(msg=None):
     sys.exit()
 
 def parseargs():
-    global strip_arch, strip_dist, outdir, summarize, list_nums
-    for arg in sys.argv[1:]:
-        if   arg in ('-A', '--no-strip-arch') : strip_arch = False
-        elif arg in ('-D', '--no-strip-dist') : strip_dist = False
-        elif arg in ('-s', '--summarize')     : summarize  = True
-        elif arg in ('-l', '--list-outputs')  : list_nums  = True
-        elif arg.startswith('-')              : usage()
-        elif outdir is None                   : outdir = arg
-        else                                  : pkgs.append(arg)
+    global outdir, pkgs, strip_arch, strip_dist, summarize, list_nums, max_nums
+    longopts = ['no-strip-arch', 'no-strip-dist', 'summarize',
+                'list-outputs', 'max-outputs=', 'help']
+    ops,args = getopt.getopt(sys.argv[1:], 'ADslL:', longopts)
+    for op,val in ops:
+        if   op in ('-A', '--no-strip-arch') : strip_arch = False
+        elif op in ('-D', '--no-strip-dist') : strip_dist = False
+        elif op in ('-s', '--summarize')     : summarize  = True
+        elif op in ('-l', '--list-outputs')  : list_nums  = True
+        elif op in ('-L', '--max-outputs')   : list_nums  = True; \
+                                               max_nums   = int(val)
+        elif op == '--help'                  : usage()
 
-    if outdir is None:
+    if not args:
         usage("Must provide a test run output location")
+
+    outdir = args[0]
+    pkgs   = args[1:]
 
     if summarize and not pkgs:
         usage("Must specify package list for --summarize")
@@ -256,4 +264,6 @@ if __name__ == '__main__':
     except RuntimeError as e:
         print >>sys.stderr, "Error: %s" % e.message
         sys.exit(1)
+    except getopt.GetoptError as e:
+        usage(e.msg)
 
