@@ -101,12 +101,6 @@ def nvrgen(items):
         yield [na,evr]
         items[:2] = []
 
-def isdir(fn):
-    try:
-        return stat.S_ISDIR(os.stat(fn).st_mode)
-    except OSError:
-        return False
-
 def rpm_qa2na_vr(line):
     line = re.sub(r'(\.rpm)?\r?\n?$', '', line)
     if re.search(arch_pat, line):
@@ -124,7 +118,7 @@ def rpm_qa2na_vr(line):
     return [na,vr]
 
 def nvrmap(output):
-    if not isdir(output):
+    if not os.path.isdir(output):
         log = output
     else:
         globpat = "%s/output/osg-test-*.log" % output
@@ -211,7 +205,7 @@ def get_summary_header():
     return header
 
 def get_run_output_dirs(rundir):
-    if isdir(rundir):
+    if os.path.isdir(rundir):
         pass  # OK, specified path exists
     elif re.match(r'run-20[0-9]{6}-[0-9]{4}$', rundir):
         rundir = "%s/%s" % (GLOBAL_RUNS_DIR, rundir)
