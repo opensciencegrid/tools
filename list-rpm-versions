@@ -20,7 +20,9 @@ subdirectories for that set of osg test runs.
 Options:
   -A, --no-strip-arch  don't attempt to strip .arch from package names
   -D, --no-strip-dist  don't attempt to strip .dist tag from package releases
+
   -s, --summarize      summarize results for all output subdirs
+  -l, --list-outputs   list output numbers (summarize mode only)
 """
 
 import collections
@@ -38,6 +40,8 @@ pkgs       = []
 strip_arch = True
 strip_dist = True
 summarize  = False
+list_nums  = False
+max_nums   = 7
 
 arch_pat = r'\.(x86_64|i[3-6]86|noarch|src)$'
 dist_pat = r'((\.osg(\d+)?)?\.[es]l[5-9](_[\d.]+)?(\.centos)?|\.osg|\.fc\d+)$'
@@ -50,11 +54,12 @@ def usage(msg=None):
     sys.exit()
 
 def parseargs():
-    global strip_arch, strip_dist, outdir, summarize
+    global strip_arch, strip_dist, outdir, summarize, list_nums
     for arg in sys.argv[1:]:
         if   arg in ('-A', '--no-strip-arch') : strip_arch = False
         elif arg in ('-D', '--no-strip-dist') : strip_dist = False
         elif arg in ('-s', '--summarize')     : summarize  = True
+        elif arg in ('-l', '--list-outputs')  : list_nums  = True
         elif arg.startswith('-')              : usage()
         elif outdir is None                   : outdir = arg
         else                                  : pkgs.append(arg)
@@ -133,10 +138,10 @@ def nvrmap(output):
         # at most 1-word per line; assume this is 'rpm -qa' output
         return dict(map(rpm_qa2na_vr, txt.split()))
 
-def print_table(headercol, table):
-    table = [headercol] + table
+def print_table(header, table):
+    table = [header] + table
     widths = [ max(map(len,col)) for col in zip(*table) ]
-    table[1:1] = [[ '-' * n for n in widths ]]
+    table[1:1] = [[ '-' * n for n in map(len,header) ]]
     for i,row in enumerate(table):
         spacing = [ w-len(x) for x,w in zip(row,widths) ]
         print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
@@ -165,7 +170,8 @@ def single_output_pkg_vrs(output, pkgs):
 
 def display_single_output(output, pkgs):
     pkg_vrs = single_output_pkg_vrs(output, pkgs)
-    print_table(["Package", output], pkg_vrs)
+    name_field = "Package" if strip_arch else "Package.Arch"
+    print_table([name_field, output], pkg_vrs)
 
 class autodict(collections.defaultdict):
     def __init__(self,*other):
@@ -183,7 +189,18 @@ try:
 except ImportError:
     rpmvercmp = None
 
-def summarize_outputs(rundir, pkgs):
+def outputnum(output):
+    m = re.search(r'(?:/|^)output-(\d+)/?', output)
+    return m.group(1) if m else output
+
+def get_summary_header():
+    name_field = "Package" if strip_arch else "Package.Arch"
+    header = [name_field, "Version-Release", "Count"]
+    if list_nums:
+        header.append("Output-Nums")
+    return header
+
+def get_run_output_dirs(rundir):
     if isdir(rundir):
         pass  # OK, specified path exists
     elif re.match(r'run-20[0-9]{6}-[0-9]{4}$', rundir):
@@ -197,20 +214,34 @@ def summarize_outputs(rundir, pkgs):
     if not outputs:
         raise RuntimeError("no output dirs found under '%s'" % rundir)
 
-    pkgstats = autodict()
+    return outputs
 
+
+def summarize_outputs(rundir, pkgs):
+    outputs = get_run_output_dirs(rundir)
+
+    pkgstats = autodict()
     for output in outputs:
         pkg_vrs = single_output_pkg_vrs(output, pkgs)
         for pkg,vr in pkg_vrs:
-            pkgstats[pkg][vr] += 1
+            pkgstats[pkg][vr]["count"] += 1
+            if list_nums:
+                pkgstats[pkg][vr]["outputs"] += [outputnum(output)]
 
+    header = get_summary_header()
     pkgstatslist = []
     for pkg in sorted(pkgstats):
         for vr in sorted(pkgstats[pkg], cmp=rpmvercmp):
-            pkgstatslist.append([pkg, vr, str(pkgstats[pkg][vr])])
-        pkgstatslist.append(['', '', ''])
+            row = [pkg, vr, str(pkgstats[pkg][vr]["count"])]
+            if list_nums:
+                nums_str =','.join(pkgstats[pkg][vr]["outputs"][:max_nums])
+                if len(pkgstats[pkg][vr]["outputs"]) > max_nums:
+                    nums_str += ",..."
+                row.append(nums_str)
+            pkgstatslist.append(row)
+        pkgstatslist.append([''] * len(header))
 
-    print_table(["Package", "Version-Release", "Count"], pkgstatslist)
+    print_table(header, pkgstatslist)
 
 def main():
     parseargs()
