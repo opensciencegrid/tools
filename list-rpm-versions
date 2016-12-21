@@ -97,8 +97,7 @@ def nvrmap(output):
         globpat = "%s/output/osg-test-*.log" % output
         log = glob.glob(globpat)
         if len(log) != 1:
-            print >>sys.stderr, "Error: could not find '%s'" % globpat
-            sys.exit(1)
+            raise RuntimeError("could not find '%s'" % globpat)
         log = log[0]
 
     # split this way since there can be more than one item per line
@@ -155,5 +154,9 @@ def main():
     display_single_output(outdir, pkgs)
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except RuntimeError as e:
+        print >>sys.stderr, "Error: %s" % e.message
+        sys.exit(1)
 
