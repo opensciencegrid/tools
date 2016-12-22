@@ -88,10 +88,13 @@ def dist_strip(evr):
     r = re.sub(dist_pat, '', r)
     return '-'.join([ev,r])
 
+def group_adjacent(a,k):
+    ''' group_adjacent([1,2,3,4,5,6], 3) -> [(1,2,3), (4,5,6)] '''
+    return zip(*([iter(a)] * k))
+
 def nvrgen(items):
     # generate sequence of ["name.arch", "epoch:version-release"] pairs
-    while items:
-        na, evr = items[:2]
+    for na,evr in group_adjacent(items, 2):
         if strip_arch:
             na = arch_strip(na)
         if strip_dist:
@@ -99,7 +102,6 @@ def nvrgen(items):
         if evr.startswith("0:"):
             evr = evr[2:]
         yield [na,evr]
-        items[:2] = []
 
 def rpm_qa2na_vr(line):
     line = re.sub(r'(\.rpm)?\r?\n?$', '', line)
