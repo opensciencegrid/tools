@@ -164,13 +164,15 @@ def single_output_pkg_vrs(output, pkgs):
     match_rpms = set(pkgs)
     missing_rpms = match_rpms - bare_rpms
 
-    if strip_arch:
+    if not pkgs:
+        all_match_rpms = rpms
+    elif strip_arch:
         all_match_rpms = match_rpms
     else:
         matching_rpms = set(x for x in rpms if arch_strip(x) in match_rpms)
         all_match_rpms = matching_rpms | missing_rpms
 
-    display_pkgs = sorted(all_match_rpms if pkgs else rpms)
+    display_pkgs = sorted(all_match_rpms)
 
     return [ [pkg, rpms.get(pkg, '-')] for pkg in display_pkgs ]
 
