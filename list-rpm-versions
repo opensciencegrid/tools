@@ -27,7 +27,9 @@ Options:
 """
 
 import collections
+import itertools
 import getopt
+import pickle
 import glob
 import stat
 import sys
@@ -224,13 +226,27 @@ def get_run_output_dirs(rundir):
 
     return outputs
 
+# run a function call in a background coprocess, return callable result
+def bgcall(func, *a, **kw):
+    r,w = itertools.starmap(os.fdopen, zip(os.pipe(), "rw"))
+
+    if os.fork():  # parent
+        w.close()
+        return lambda : pickle.load(r)
+    else:  # child
+        r.close()
+        ret = func(*a,**kw)
+        s = pickle.dump(ret, w)
+        w.close()
+        os._exit(0)
+
 def summarize_outputs(rundir, pkgs):
     outputs = get_run_output_dirs(rundir)
 
     pkgstats = autodict()
-    for output in outputs:
-        pkg_vrs = single_output_pkg_vrs(output, pkgs)
-        for pkg,vr in pkg_vrs:
+    bgcalls = [ bgcall(single_output_pkg_vrs, o, pkgs) for o in outputs ]
+    for get_pkg_vrs,output in zip(bgcalls, outputs):
+        for pkg,vr in get_pkg_vrs():
             pkgstats[pkg][vr] += [outputnum(output)]
 
     header = get_summary_header()
