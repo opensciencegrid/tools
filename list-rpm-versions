@@ -152,29 +152,29 @@ def print_table(header, table):
         spacing = [ w-len(x) for x,w in zip(row,widths) ]
         print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
 
-def single_output_pkg_vrs(output, pkgs):
-    rpms = nvrmap(output)
+def single_output_pkg_vrs(output, want_pkgs):
+    have_rpms = nvrmap(output)
 
     # arch-stripped rpm names
     if strip_arch:
-        bare_rpms = set(rpms)
+        have_pkgs = set(have_rpms)
     else:
-        bare_rpms = set(map(arch_strip, rpms))
+        have_pkgs = set(map(arch_strip, have_rpms))
 
-    match_rpms = set(pkgs)
-    missing_rpms = match_rpms - bare_rpms
+    want_pkgs = set(want_pkgs)
+    missing_pkgs = want_pkgs - have_pkgs
 
-    if not pkgs:
-        all_match_rpms = rpms
+    if not want_pkgs:
+        display_rpms = have_rpms
     elif strip_arch:
-        all_match_rpms = match_rpms
+        display_rpms = want_pkgs
     else:
-        matching_rpms = set(x for x in rpms if arch_strip(x) in match_rpms)
-        all_match_rpms = matching_rpms | missing_rpms
+        matching_rpms = set(x for x in have_rpms if arch_strip(x) in want_pkgs)
+        display_rpms = matching_rpms | missing_pkgs
 
-    display_pkgs = sorted(all_match_rpms)
+    display_rpms = sorted(display_rpms)
 
-    return [ [pkg, rpms.get(pkg, '-')] for pkg in display_pkgs ]
+    return [ [rpm, have_rpms.get(rpm, '-')] for rpm in display_rpms ]
 
 def display_single_output(output, pkgs):
     pkg_vrs = single_output_pkg_vrs(output, pkgs)
