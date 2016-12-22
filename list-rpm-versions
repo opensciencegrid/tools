@@ -232,6 +232,7 @@ def summarize_outputs(rundir, pkgs):
             pkgstats[pkg][vr] += [outputnum(output)]
 
     header = get_summary_header()
+    separator = [''] * len(header)
     pkgstatslist = []
     for pkg in sorted(pkgstats):
         for vr in sorted(pkgstats[pkg], cmp=rpmvercmp):
@@ -242,7 +243,7 @@ def summarize_outputs(rundir, pkgs):
                     nums_str += ",..."
                 row.append(nums_str)
             pkgstatslist.append(row)
-        pkgstatslist.append([''] * len(header))
+        pkgstatslist.append(separator)
 
     print_table(header, pkgstatslist)
 
