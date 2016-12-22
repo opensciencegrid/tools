@@ -236,10 +236,11 @@ def summarize_outputs(rundir, pkgs):
     pkgstatslist = []
     for pkg in sorted(pkgstats):
         for vr in sorted(pkgstats[pkg], cmp=rpmvercmp):
-            row = [pkg, vr, str(len(pkgstats[pkg][vr]))]
+            count = len(pkgstats[pkg][vr])
+            row = [pkg, vr, str(count)]
             if list_nums:
                 nums_str =','.join(pkgstats[pkg][vr][:max_nums])
-                if len(pkgstats[pkg][vr]) > max_nums:
+                if count > max_nums:
                     nums_str += ",..."
                 row.append(nums_str)
             pkgstatslist.append(row)
