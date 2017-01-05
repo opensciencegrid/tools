@@ -8,7 +8,7 @@ Compare and print any version differences between RPMs installed in both of
 two osg-test run directories, as found in output-NNN/output/osg-test-*.log
 
 The outputs can also be a root.log from a koji/mock build, or the raw output
-of an 'rpm -qa' command.
+of an 'rpm -qa' command, or an osg-profile.txt from osg-system-profiler.
 
 Options:
   -A, --no-strip-arch  don't attempt to strip .arch from package names
@@ -105,15 +105,24 @@ def nvrmap(output):
             sys.exit(1)
         log = log[0]
 
-    # split this way since there can be more than one item per line
-    txt = open(log).read()
-    if ' ' in txt:
+    txt = open(log).read().replace('\r\n', '\n')  # convert dos line endings
+    if '***** All RPMs' in txt:
+        # assume this is osg-system-profiler output (osg-profile.txt)
+        m = re.search(r'\*\*\*\*\* All RPMs\n(.*?)\n\n', txt, re.S)
+        if m:
+            txt = m.group(1)
+            return dict(map(rpm_qa2na_vr, txt.split()))
+        else:
+            print >>sys.stderr, "No RPMs found in profiler output '%s'" % log
+            sys.exit(1)
+    elif ' ' in txt:
         # strip "DEBUG util.py:388:  " in case this is coming from a root.log
         txt = re.sub(r'\n[A-Z]+ .*?:\d+:  ', r'\n', txt)
         # don't include Install list from cleanup/downgrade
         txt = re.sub(r'\nosgtest: .* special_cleanup[\d\D]*', r'\n', txt)
         items_pat = (r'^(?:Dependency )?(?:Installed|Updated|Replaced):\n'
                      r'(.*?)\n(?:\n|(?=[^ ]))')
+        # split this way since there can be more than one item per line
         items = ' '.join(re.findall(items_pat, txt, re.S | re.M)).split()
         return dict(nvrgen(items))
     else:
