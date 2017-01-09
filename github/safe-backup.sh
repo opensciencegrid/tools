@@ -56,6 +56,7 @@ initrepo () {
 
 # create reflog for all tags; detect tag updates
 safetags () {
+    local ret=0
     for tag in $(git tag); do
         taglog=logs/refs/tags/$tag
         tagdir=${taglog%/*}
@@ -66,8 +67,10 @@ safetags () {
             git reflog refs/tags/$tag
             echo
             touch $tmpd/failures-detected
+            ret=1
         fi
     done
+    return $ret
 }
 
 email_errors () {
