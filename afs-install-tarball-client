@@ -86,8 +86,6 @@ install_tarball () {
     osg/osg-post-install
     message "Setting up CA certs"
     ./osgrun osg-ca-manage setupCA --url osg
-    message "Getting VO data"
-    ./osgrun osg-update-vos
     cd "$OLDPWD"
 }
 
