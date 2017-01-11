@@ -245,7 +245,7 @@ def bgcall(func, *a, **kw):
     else:  # child
         r.close()
         ret = func(*a,**kw)
-        s = pickle.dump(ret, w)
+        pickle.dump(ret, w)
         w.close()
         os._exit(0)
 
