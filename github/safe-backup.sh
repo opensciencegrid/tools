@@ -99,8 +99,14 @@ else
     remotes=( $(grep '^[^#]' "$git_remotes_listfile") )
 
     for remote in "${remotes[@]}"; do
-        safebakrepo
-        [[ $? -eq 0 ]] || touch $tmpd/failures-detected
+        for (( retries=3; retries > 0; retries-- )); do
+            safebakrepo_out=$(safebakrepo)
+            safebakrepo_ret=$?
+            echo "$safebakrepo_out"
+            grep -q "Operation now in progress" <<< "$safebakrepo_out" || break
+            sleep 30
+        done
+        [[ $safebakrepo_ret -eq 0 ]] || touch $tmpd/failures-detected
     done
 fi
 echo ---
