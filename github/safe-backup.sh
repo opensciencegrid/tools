@@ -100,7 +100,7 @@ else
 
     for remote in "${remotes[@]}"; do
         for (( retries=3; retries > 0; retries-- )); do
-            safebakrepo_out=$(safebakrepo)
+            safebakrepo_out=$(safebakrepo 2>&1)
             safebakrepo_ret=$?
             echo "$safebakrepo_out"
             grep -q "Operation now in progress" <<< "$safebakrepo_out" || break
