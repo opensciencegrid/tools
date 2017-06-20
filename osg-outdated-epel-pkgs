@@ -27,7 +27,7 @@ except ImportError:
     from miscutils import stringToVersion
 
 
-SERIES = '3.3'
+SERIES = '3.4'
 EL     = '6'
 TAG    = 'release'
 
