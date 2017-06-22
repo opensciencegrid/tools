@@ -76,7 +76,11 @@ def strip_dist_tag(seq, dist_pfx):
 
 def extract_href_rpm(line):
     m = re.search(r'<a href="([^"]+(-[^-"]+){2})\.src\.rpm"', line)
-    return m and m.groups()[0]
+    if m:
+        return m.groups()[0]
+    m = re.search(r'<a href="(\w)/"', line)
+    if m:
+        return get_epel_list(m.groups()[0])
 
 def get_handle(fn, arg, cache_name):
     if use_cached:
@@ -90,13 +94,19 @@ def get_handle(fn, arg, cache_name):
 
     return handle
 
-def get_epel_list():
+def get_epel_list(subdir=None):
     epel_url = "http://dl.fedoraproject.org/pub/epel/%s/SRPMS/" % EL
-    cache_name = 'epel%s.html' % EL
+    if subdir is None:
+        cache_name = 'epel%s.html' % EL
+    else:
+        cache_name = 'epel%s_%s.html' % (EL,subdir)
+        epel_url += "%s/" % subdir
 
     handle = get_handle(urllib2.urlopen, epel_url, cache_name)
 
     nvrs = filter(None, map(extract_href_rpm, handle))
+    if nvrs and type(nvrs[0]) is list:
+        nvrs = [ nvr for nvrlist in nvrs for nvr in nvrlist ]
     return strip_dist_tag(nvrs, 'el%s' % EL)
 
 def get_osg_list():
