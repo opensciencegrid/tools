@@ -1,0 +1,192 @@
+#!/usr/bin/python
+
+"""
+Usage:
+  %s [3.3|3.4] [el6|el7] [development|testing|release]
+
+Default is:
+  %s el%s %s
+
+Options:
+  --make-cache     save i2_X.html and osg-3.X-elX-XXX.list for offline use
+  --cached         used cached files instead of pulling live versions
+  --[no-]color     colorize version differences (default = True if tty)
+  --html           generate html output (implies --color)
+  --preamble=text  print some preamble text before the report
+  --show-all       show versions even for non-outdated packages
+"""
+
+import sys
+import os
+import re
+import rpm
+import urllib2
+try:
+    from rpmUtils.miscutils import stringToVersion
+except ImportError:
+    from miscutils import stringToVersion
+
+
+SERIES = '3.4'
+EL     = '6'
+TAG    = 'release'
+
+use_cached = False
+make_cache = False
+use_color  = sys.stdout.isatty()
+show_all   = False
+html_out   = False
+preamble   = None
+
+def usage():
+    print __doc__ % (os.path.basename(__file__), SERIES, EL, TAG)
+    sys.exit()
+
+for arg in sys.argv[1:]:
+    if re.search(r'^el[5-9]$', arg):
+        EL = arg[2]
+    elif re.search(r'^[3-9]\.[0-9]$', arg):
+        SERIES = arg
+    elif re.search(r'^(upcoming-)?(development|testing|release)$', arg):
+        TAG = arg
+    elif arg == '--cached':
+        use_cached = True
+    elif arg == '--make-cache':
+        make_cache = True
+    elif arg == '--color':
+        use_color = True
+    elif arg == '--no-color':
+        use_color = False
+    elif arg == '--html':
+        html_out = True
+        use_color = True
+    elif arg.startswith('--preamble='):
+        preamble = arg[len('--preamble='):]
+    elif arg == '--show-all':
+        show_all = True
+    else:
+        usage()
+
+if use_cached and make_cache:
+    usage()
+
+def strip_dist_tag(seq, dist_pfx):
+    pat = r'\.%s[^-]*$' % dist_pfx
+    return [ re.sub(pat, '', nvr) for nvr in seq ]
+
+def extract_href_rpm(line):
+    m = re.search(r'<a href="([^"]+(-[^-"]+){2})\.src\.rpm"', line)
+    if m:
+        return m.groups()[0]
+    m = re.search(r'<a href="(\w)/"', line)
+    if m:
+        return get_i2_list(m.groups()[0])
+
+def get_handle(fn, arg, cache_name):
+    if use_cached:
+        handle = open(cache_name)
+    else:
+        handle = fn(arg)
+        if make_cache:
+            open(cache_name, 'w').write(handle.read())
+            print "Wrote:", cache_name
+            handle = []
+
+    return handle
+
+def get_i2_list(subdir=None):
+    i2_url = "http://software.internet2.edu/rpms/el%s/SRPMS/" % EL
+    cache_name = 'i2_%s.html' % EL
+
+    handle = get_handle(urllib2.urlopen, i2_url, cache_name)
+
+    nvrs = filter(None, map(extract_href_rpm, handle))
+    return strip_dist_tag(nvrs, 'el%s' % EL)
+
+def get_osg_list():
+    osg_tag = "osg-%s-el%s-%s" % (SERIES, EL, TAG)
+    cmd = "osg-koji list-tagged --latest --rpms %s" % osg_tag
+    cache_name = osg_tag + '.list'
+
+    handle = get_handle(os.popen, cmd, cache_name)
+
+    nvrs = [ line[:-5] for line in handle if line.endswith(".src\n") ]
+    return strip_dist_tag(nvrs, 'osg')
+
+def rpmvercmp(a,b):
+    return rpm.labelCompare(*[stringToVersion(x) for x in (a,b)])
+
+def n_vr(nvr):
+    n,v,r = nvr.rsplit("-",2)
+    return n, v+'-'+r
+
+def nvrmap(seq):
+    return dict( n_vr(nvr) for nvr in seq )
+
+if make_cache:
+    get_i2_list()
+    get_osg_list()
+    sys.exit()
+
+i2_map = nvrmap(get_i2_list())
+osg_map  = nvrmap(get_osg_list())
+
+def colorize(color, *seq):
+    return [ "\x1b[%sm%s\x1b[0m" % (color, x) for x in seq ]
+
+def colorize_vr(vr1, vr2):
+    v1,r1 = vr1.split('-')
+    v2,r2 = vr2.split('-')
+
+    if v1 != v2:
+        v1,v2 = colorize('1;32', v1, v2)
+    elif r1 != r2:
+        r1,r2 = colorize('1;34', r1, r2)
+
+    return map('-'.join, [[v1,r1],[v2,r2]])
+
+def colorize_html(color, *seq):
+    return [ '<span class="%s">%s</span>' % (color, x) for x in seq ]
+
+def colorize_html_vr(vr1, vr2):
+    v1,r1 = vr1.split('-')
+    v2,r2 = vr2.split('-')
+
+    if v1 != v2:
+        v1,v2 = colorize_html('vdiff', v1, v2)
+    elif r1 != r2:
+        r1,r2 = colorize_html('rdiff', r1, r2)
+
+    return map('-'.join, [[v1,r1],[v2,r2]])
+
+if html_out:
+    colorize_vr = colorize_html_vr
+    print ("<html>\n<head>\n<style type='text/css'>\n.vdiff {color:green}\n"
+           ".rdiff {color:blue}\n</style>\n</head>\n<body>\n<pre>")
+
+if preamble:
+    print preamble
+    print
+
+pkg_diffs = []
+for pkg in sorted(osg_map):
+    if pkg in i2_map:
+        vrcmp = rpmvercmp(osg_map[pkg], i2_map[pkg])
+        if vrcmp < 0 or show_all:
+            pkg_diffs.append([pkg, osg_map[pkg], i2_map[pkg]])
+
+if pkg_diffs:
+    pkg_diffs[:0] = [["Package", "OSG " + SERIES, "I2 EL" + EL]]
+    widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
+    pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
+    for i,row in enumerate(pkg_diffs):
+        spacing = [ w-len(x) for x,w in zip(row,widths) ]
+        if use_color and i > 1:
+            row[1:] = colorize_vr(*row[1:])
+        print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
+else:
+    print "No package version differences"
+
+if html_out:
+    print "</pre>\n</body>\n</html>"
+
