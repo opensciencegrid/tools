@@ -2,7 +2,9 @@
 
 """
 Usage:
-  %s [3.1|3.2|3.3] [el5|el6|el7] [development|testing|release]
+  %s [3.2|3.3|3.4] [el5|el6|el7] [development|testing|release]
+Or:
+  %s         [goc] [el5|el6|el7] [itb|production]
 
 Default is:
   %s el%s %s
@@ -39,15 +41,17 @@ html_out   = False
 preamble   = None
 
 def usage():
-    print __doc__ % (os.path.basename(__file__), SERIES, EL, TAG)
+    script = os.path.basename(__file__)
+    print __doc__ % (script, script, SERIES, EL, TAG)
     sys.exit()
 
 for arg in sys.argv[1:]:
     if re.search(r'^el[5-9]$', arg):
         EL = arg[2]
-    elif re.search(r'^[3-9]\.[0-9]$', arg):
+    elif re.search(r'^[3-9]\.[0-9]$', arg) or arg == 'goc':
         SERIES = arg
-    elif re.search(r'^(upcoming-)?(development|testing|release)$', arg):
+    elif re.search(r'^(upcoming-)?(development|testing|release)$', arg) \
+         or arg in ('itb', 'production'):
         TAG = arg
     elif arg == '--cached':
         use_cached = True
@@ -69,6 +73,9 @@ for arg in sys.argv[1:]:
 
 if use_cached and make_cache:
     usage()
+
+if SERIES == 'goc' and TAG == 'release':
+    TAG = 'production'
 
 def strip_dist_tag(seq, dist_pfx):
     pat = r'\.%s[^-]*$' % dist_pfx
@@ -110,7 +117,10 @@ def get_epel_list(subdir=None):
     return strip_dist_tag(nvrs, 'el%s' % EL)
 
 def get_osg_list():
-    osg_tag = "osg-%s-el%s-%s" % (SERIES, EL, TAG)
+    if SERIES == 'goc':
+        osg_tag = "%s-el%s-%s" % (SERIES, EL, TAG)
+    else:
+        osg_tag = "osg-%s-el%s-%s" % (SERIES, EL, TAG)
     cmd = "osg-koji list-tagged --latest --rpms %s" % osg_tag
     cache_name = osg_tag + '.list'
 
