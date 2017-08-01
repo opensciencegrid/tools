@@ -50,6 +50,10 @@ initrepo () {
 
     # allow non-ff pull request updates, and ff-only updates for all other refs
     git config remote.origin.fetch '+refs/pull/*:refs/pull/*'
+    # matyas reserves the right to force-push to wip/* branches
+    if [[ $remote =~ matyasselmeci ]]; then
+        git config --add remote.origin.fetch '+refs/wip/*:refs/wip/*'
+    fi
     git config --add remote.origin.fetch 'refs/*:refs/*'
   )
 }
