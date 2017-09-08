@@ -36,6 +36,7 @@ COMMANDs:
   (*)   set-description  OWNER REPO DESCRIPTION
   (*)   protect-branch   OWNER REPO BRANCH
   (*)   unprotect-branch OWNER REPO BRANCH
+  (*)   request-pull     OWNER REPO[:BRANCH] [USER:]BRANCH TITLE BODY
         
 (*) USER login required
 
@@ -152,6 +153,9 @@ github API notes:
 : delete         DELETE /repos/:owner/:repo
 : rename (edit)  PATCH /repos/:owner/:repo  {"name": "New-Repo-Name"}
 : protect-branch PATCH /repos/:owner/:repo/branches/:branch {"enabled": "true"}
+: request-pull   POST /repos/:owner/:repo/pulls {
+                      "title": "New Feature", "body": "PR description",
+                      "base": "master", "head": "someuser:somebranch"}
 """
 
 def print_names(seq):
@@ -242,6 +246,20 @@ def unprotect_branch(owner, repo, branch):
     snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
            {"protection": {"enabled": False}})
 
+def request_pull(owner, baserepo, frombranch, title, body):
+    if ':' in baserepo:
+        repo, basebranch = baserepo.split(':')
+    else:
+        repo, basebranch = baserepo, "master"
+
+    if ':' in frombranch:
+        head = frombranch
+    else:
+        head = "%s:%s" % (login_user, frombranch)
+
+    print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo),
+           {"title": title, "body": body, "head": head, "base": basebranch})])
+
 methods = {
     'list-mine':        [list_mine,        0, True],
     'list-user':        [list_user,        1, False],
@@ -258,7 +276,8 @@ methods = {
     'rename':           [rename_repo,      3, True],
     'set-description':  [set_description,  3, True],
     'protect-branch':   [protect_branch,   3, True],
-    'unprotect-branch': [unprotect_branch, 3, True]
+    'unprotect-branch': [unprotect_branch, 3, True],
+    'request-pull':     [request_pull,     5, True]
 }
 
 def checkfields(f):
@@ -297,6 +316,8 @@ def main(args):
     if user:
         user, passwd = getpw(user, passfd)
         authsetup(user, passwd)
+        global login_user
+        login_user = user
     elif user_required:
         usage("USER required for %s command" % command)
 
