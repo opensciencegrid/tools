@@ -36,7 +36,9 @@ COMMANDs:
   (*)   set-description  OWNER REPO DESCRIPTION
   (*)   protect-branch   OWNER REPO BRANCH
   (*)   unprotect-branch OWNER REPO BRANCH
+        list-prs         OWNER REPO
   (*)   request-pull     OWNER REPO[:BRANCH] [USER:]BRANCH TITLE BODY
+  (*)   close-pr         OWNER REPO NUMBER
         
 (*) USER login required
 
@@ -156,6 +158,8 @@ github API notes:
 : request-pull   POST /repos/:owner/:repo/pulls {
                       "title": "New Feature", "body": "PR description",
                       "base": "master", "head": "someuser:somebranch"}
+: close-pr       PATCH /repos/:owner/:repo/pulls/:number {"state": "closed"}
+: list-prs       GET /repos/:owner/:repo/pulls
 """
 
 def print_names(seq):
@@ -193,6 +197,10 @@ def list_mine():
 
 def list_user(username):
     print_fields(snarfer(GET, '/users/%s/repos' % username))
+
+def list_prs(owner, repo):
+    options.listfields = ['html_url', 'title']
+    print_fields(snarfer(GET, '/repos/%s/%s/pulls' % (owner, repo)))
 
 def list_org(org):
     print_fields(snarfer(GET, '/orgs/%s/repos' % org))
@@ -246,6 +254,10 @@ def unprotect_branch(owner, repo, branch):
     snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
            {"protection": {"enabled": False}})
 
+def close_pr(owner, repo, number):
+    snarfer(PATCH, "/repos/%s/%s/pulls/%s" % (owner, repo, number),
+           {"state": "closed"})
+
 def request_pull(owner, baserepo, frombranch, title, body):
     if ':' in baserepo:
         repo, basebranch = baserepo.split(':')
@@ -277,7 +289,9 @@ methods = {
     'set-description':  [set_description,  3, True],
     'protect-branch':   [protect_branch,   3, True],
     'unprotect-branch': [unprotect_branch, 3, True],
-    'request-pull':     [request_pull,     5, True]
+    'request-pull':     [request_pull,     5, True],
+    'list-prs':         [list_prs,         2, False],
+    'close-pr':         [close_pr,         3, True]
 }
 
 def checkfields(f):
