@@ -38,6 +38,7 @@ COMMANDs:
   (*)   unprotect-branch OWNER REPO BRANCH
         list-prs         OWNER REPO
   (*)   request-pull     OWNER REPO[:BRANCH] [USER:]BRANCH TITLE BODY
+  (*)   merge-pr         OWNER REPO NUMBER
   (*)   close-pr         OWNER REPO NUMBER
         
 (*) USER login required
@@ -58,6 +59,7 @@ Options:
 apiurl = 'https://api.github.com'
 
 GET    = 'GET'
+PUT    = 'PUT'
 POST   = 'POST'
 PATCH  = 'PATCH'
 DELETE = 'DELETE'
@@ -158,6 +160,8 @@ github API notes:
 : request-pull   POST /repos/:owner/:repo/pulls {
                       "title": "New Feature", "body": "PR description",
                       "base": "master", "head": "someuser:somebranch"}
+: merge-pr       PUT /repos/:owner/:repo/pulls/:number/merge
+                 # {"commit_title": "title", "commit_message": "desc"}
 : close-pr       PATCH /repos/:owner/:repo/pulls/:number {"state": "closed"}
 : list-prs       GET /repos/:owner/:repo/pulls
 """
@@ -254,6 +258,9 @@ def unprotect_branch(owner, repo, branch):
     snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
            {"protection": {"enabled": False}})
 
+def merge_pr(owner, repo, number):
+    snarfer(PUT, "/repos/%s/%s/pulls/%s/merge" % (owner, repo, number))
+
 def close_pr(owner, repo, number):
     snarfer(PATCH, "/repos/%s/%s/pulls/%s" % (owner, repo, number),
            {"state": "closed"})
@@ -291,6 +298,7 @@ methods = {
     'unprotect-branch': [unprotect_branch, 3, True],
     'request-pull':     [request_pull,     5, True],
     'list-prs':         [list_prs,         2, False],
+    'merge-pr':         [merge_pr,         3, True],
     'close-pr':         [close_pr,         3, True]
 }
 
