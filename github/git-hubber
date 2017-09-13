@@ -176,6 +176,11 @@ def print_fields(seq):
     for row in rows:
         print '\t'.join(row)
 
+def print_fields_sortby(seq, fields, sortby):
+    rows = sorted( [x[sortby]] + [ x[f] for f in fields ] for x in seq )
+    for row in rows:
+        print '\t'.join(row[1:])
+
 def print_refs(seq):
     for x in seq:
         print x["commit"]["sha"], x["name"]
@@ -203,8 +208,8 @@ def list_user(username):
     print_fields(snarfer(GET, '/users/%s/repos' % username))
 
 def list_prs(owner, repo):
-    options.listfields = ['html_url', 'title']
-    print_fields(snarfer(GET, '/repos/%s/%s/pulls' % (owner, repo)))
+    print_fields_sortby(snarfer(GET, '/repos/%s/%s/pulls' % (owner, repo)),
+            ['html_url', 'title'], 'number')
 
 def list_org(org):
     print_fields(snarfer(GET, '/orgs/%s/repos' % org))
