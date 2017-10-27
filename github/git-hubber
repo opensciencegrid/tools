@@ -31,6 +31,7 @@ COMMANDs:
   (*)   create-mine      REPO
   (*)   create-org       ORG   REPO
   (*)   fork-from        OWNER REPO
+        list-forks       OWNER REPO
   (*)   delete           OWNER REPO
   (*)   rename           OWNER REPO NEWNAME
   (*)   set-description  OWNER REPO DESCRIPTION
@@ -154,6 +155,8 @@ github API notes:
 : list-refs      GET /repos/:owner/:repo/git/refs  # aka git_refs_url
 : create-mine    POST /user/repos      {"name": "Repo-Name"}
 : create-org     POST /orgs/:org/repos {"name": "Repo-Name"}
+: list-forks     GET /repos/:owner/:repo/forks
+: fork-from      POST /repos/:owner/:repo/forks
 : delete         DELETE /repos/:owner/:repo
 : rename (edit)  PATCH /repos/:owner/:repo  {"name": "New-Repo-Name"}
 : protect-branch PATCH /repos/:owner/:repo/branches/:branch {"enabled": "true"}
@@ -238,6 +241,9 @@ def create_org(org, repo):
 def fork_mine(owner, repo):
     snarfer(POST, '/repos/%s/%s/forks' % (owner,repo))
 
+def list_forks(owner, repo):
+    print_fields(snarfer(GET, '/repos/%s/%s/forks' % (owner, repo)))
+
 def delete_repo(owner, repo):
     snarfer(DELETE, '/repos/%s/%s' % (owner,repo))
 
@@ -297,6 +303,7 @@ methods = {
     'create-mine':      [create_mine,      True],
     'create-org':       [create_org,       True],
     'fork-from':        [fork_mine,        True],
+    'list-forks':       [list_forks,       False],
     'delete':           [delete_repo,      True],
     'rename':           [rename_repo,      True],
     'set-description':  [set_description,  True],
