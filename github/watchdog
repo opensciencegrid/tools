@@ -11,9 +11,9 @@ repodir=${rootdir}/repo
 email_from=`whoami`@cs.wisc.edu
 email_to="matyas+cron@cs.wisc.edu edquist@cs.wisc.edu tim@cs.wisc.edu blin@cs.wisc.edu cat@cs.wisc.edu"
 
-subject_ok="GitHub AFS backups: all fetches OK"
-subject_bad="GitHub AFS backups: some fetches failed"
-subject_nofetch="GitHub AFS backups: some fetches skipped"
+subject_ok="Git[Hub] Safe-backup: all fetches OK"
+subject_bad="Git[Hub] Safe-backup: some fetches failed"
+subject_nofetch="Git[Hub] Safe-backup: some fetches skipped"
 
 # fetch starts every 10 minutes (600 sec) and typically takes up to 20 sec
 timestamp_threshold=580
