@@ -12,7 +12,7 @@ KOJIHOST                = 'koji.chtc.wisc.edu'
 DBHOST                  = 'db-01.batlab.org'
 RETRIES                 = 10
 RETRY_WAIT              = 60
-NOTIFY_EMAILS           = [x + '@cs.wisc.edu' for x in ['blin', 'cat', 'edquist', 'matyas', 'tim']]
+NOTIFY_EMAILS           = [x + '@cs.wisc.edu' for x in ['blin', 'cat', 'edquist', 'matyas+cron', 'tim']]
 KEY                     = '/root/osg_backup_key'
 
 DEDUPE_SCRIPT           = "%s/dedupe" % REMOTE_BASE_PATH
