@@ -17,16 +17,13 @@ case $1 in
 esac
 done
 
-recurse_if_el7 () {
-  case $EL in
-    7 ) perl -lne 'print $1 if m{<a href="(\w/)">}' \
-        | wget -qO- -B "$baseurl" -i- ;;
-    * ) cat ;;
-  esac
+recurse_packages () {
+  perl -lne 'print $1 if m{<a href="(\w/)">}' \
+      | wget -qO- -B "$baseurl" -i-
 }
 
 list_epel () {
-  wget -qO- "$baseurl" | recurse_if_el7 \
+  wget -qO- "$baseurl" | recurse_packages \
   | perl -lne 'print $1 if /<a href="([^"]+)(-[^-"]+){2}"/'
 }
 
@@ -39,8 +36,8 @@ print_intersection () {
   fgrep $grepops -xf <(list_epel) <(list_epelrescue) || echo "(none)"
 }
 
-for EL in 5 6 7; do
-  baseurl=http://dl.fedoraproject.org/pub/epel/$EL/SRPMS/
+for EL in 6 7; do
+  baseurl=http://dl.fedoraproject.org/pub/epel/$EL/SRPMS/Packages/
   echo "checking for packages in epelrescue$EL $sym epel$EL..."
   print_intersection | sort
   echo
