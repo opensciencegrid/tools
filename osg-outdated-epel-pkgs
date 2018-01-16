@@ -102,7 +102,7 @@ def get_handle(fn, arg, cache_name):
     return handle
 
 def get_epel_list(subdir=None):
-    epel_url = "http://dl.fedoraproject.org/pub/epel/%s/SRPMS/" % EL
+    epel_url = "http://dl.fedoraproject.org/pub/epel/%s/SRPMS/Packages/" % EL
     if subdir is None:
         cache_name = 'epel%s.html' % EL
     else:
