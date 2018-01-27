@@ -10,7 +10,6 @@ import datetime
 
 import github
 
-# API_BASE_URL = github.MainClass.DEFAULT_BASE_URL
 API_BASE_URL = 'https://api.github.com'
 RAW_DT_FMT   = '%Y-%m-%dT%H:%M:%SZ'
 
@@ -94,6 +93,8 @@ def main(argv):
         org = argv[0]
         user_token = [ l.rstrip() for l in open(argv[1]) ]
         g = github.Github(*user_token)
+        print "rate_limiting api queries remaining: %s/%s" % g.rate_limiting
+        print "---"
         o = g.get_organization(org)
         dump_org_repos(o)
     else:
