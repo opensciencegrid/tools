@@ -7,6 +7,7 @@ import sys
 import glob
 import json
 import datetime
+import operator
 
 import github
 
@@ -48,7 +49,9 @@ def dump_obj(obj):
     return True
 
 def dump_org_repos(org):
-    for repo in list(org.get_repos()):
+    repos = sorted(org.get_repos(), key=operator.attrgetter('name'))
+    for i,repo in enumerate(repos):
+        print "(%s/%s) [%s]" % (i+1, len(repos), repo.name)
         dump_repo(repo)
 
 def dump_repo(repo):
