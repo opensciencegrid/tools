@@ -14,6 +14,11 @@ import github
 API_BASE_URL = 'https://api.github.com'
 RAW_DT_FMT   = '%Y-%m-%dT%H:%M:%SZ'
 
+# sigh - the github api doesn't return a url for pull reviews
+if not hasattr(github.PullRequestReview.PullRequestReview, 'url'):
+    def prr_url(obj): return "%s/reviews/%s" % (obj.pull_request_url, obj.id)
+    github.PullRequestReview.PullRequestReview.url = property(prr_url)
+
 def rel_url_path(url):
     return url.replace(API_BASE_URL + "/", "")
 
@@ -41,7 +46,7 @@ def dump_obj(obj):
     print "writing %s" % jsonpath
     json_data = to_json(obj._rawData)  # .raw_data triggers reload
     print >>open(jsonpath, "w"), json_data
-    return relpath, jsonpath
+    return True
 
 def dump_org_repos(org):
     for repo in list(org.get_repos()):
@@ -53,18 +58,20 @@ def dump_repo(repo):
     dump_updated_obj_items(repo, "issues_comments")
     dump_updated_obj_items(repo, "pulls_comments")
     dump_updated_obj_items(repo, "releases")
+    dump_updated_obj_items(repo, "pulls", nest="reviews")
 
-def dump_updated_obj_items(obj, gettername, **igkw):
+def dump_updated_obj_items(obj, gettername, nest=None, **igkw):
     upd_path = "%s/%s.ts" % (rel_url_path(obj.url), gettername)
     itemgetter = getattr(obj, "get_" + gettername)
-    kw = get_since_kw(upd_path)
+    kw = get_since_kw(upd_path, itemgetter)
     kw.update(igkw)
     items = list(itemgetter(**kw))
-    dump_items(items, upd_path)
+    dump_items(items, upd_path, nest)
 
-def dump_items(items, updated_at_path):
+def dump_items(items, updated_at_path, nest):
     for item in items:
-        dump_obj(item)
+        if dump_obj(item) and nest:
+            dump_updated_obj_items(item, nest)
     if items:
         if hasattr(items[0], 'updated_at'):
             last_update = max( i.updated_at for i in items )
@@ -73,8 +80,9 @@ def dump_items(items, updated_at_path):
     else:
         print "no new items for %s" % updated_at_path.replace('.ts', '')
 
-def get_since_kw(path):
-    if os.path.exists(path):
+def get_since_kw(path, itemgetter):
+    want_since = ':param since:' in itemgetter.__doc__  # yikes...
+    if want_since and os.path.exists(path):
         last = raw_to_datetime(open(path).read().rstrip())
         since = last + datetime.timedelta(0, 1)
         return {'since': since}
