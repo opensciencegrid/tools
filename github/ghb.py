@@ -54,7 +54,6 @@ def dump_repo(repo):
     dump_updated_obj_items(repo, "issues", state='all')
     dump_updated_obj_items(repo, "issues_comments")
     dump_updated_obj_items(repo, "pulls_comments")
-    dump_updated_obj_items(repo, "pulls_review_comments")
     dump_updated_obj_items(repo, "releases")
 
 def dump_updated_obj_items(obj, gettername, **igkw):
