@@ -35,9 +35,7 @@ def dump_obj(obj):
     mkdir_p(os.path.dirname(relpath))
     jsonpath = relpath + '.json'
     if os.path.exists(jsonpath):
-        tsattr = 'updated_at' if hasattr(obj,'updated_at') else 'published_at'
-        updated_at = raw_to_datetime(json.load(open(jsonpath))[tsattr])
-        if getattr(obj, tsattr) == updated_at:
+        if json.load(open(jsonpath)) == obj._rawData:
             print "skipping already-up-to-date %s" % jsonpath
             return
     print "writing %s" % jsonpath
