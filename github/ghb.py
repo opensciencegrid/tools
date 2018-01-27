@@ -63,18 +63,15 @@ def dump_repo(repo):
     dump_updated_obj_items(repo, "pulls", state='all', nest="reviews")
 
 def dump_updated_obj_items(obj, gettername, nest=None, **igkw):
-    upd_path = "%s/%s.ts" % (rel_url_path(obj.url), gettername)
+    updated_at_path = "%s/%s.ts" % (rel_url_path(obj.url), gettername)
     itemgetter = getattr(obj, "get_" + gettername)
-    kw = get_since_kw(upd_path, itemgetter)
+    kw = get_since_kw(updated_at_path, itemgetter)
     kw.update(igkw)
     items = list(itemgetter(**kw))
-    dump_items(items, upd_path, nest)
-
-def dump_items(items, updated_at_path, nest):
     for item in items:
         if dump_obj(item) and nest:
             dump_updated_obj_items(item, nest)
-    if items:
+    if items and 'since' in kw:
         if hasattr(items[0], 'updated_at'):
             last_update = max( i.updated_at for i in items )
             print "writing %s" % updated_at_path
