@@ -92,7 +92,7 @@ def main(argv):
     if len(argv) == 2 and os.path.exists(argv[1]):
         org = argv[0]
         user_token = [ l.rstrip() for l in open(argv[1]) ]
-        g = github.Github(*user_token)
+        g = github.Github(*user_token, timeout=60)
         print "rate_limiting api queries remaining: %s/%s" % g.rate_limiting
         print "---"
         o = g.get_organization(org)
