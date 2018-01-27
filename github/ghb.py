@@ -41,7 +41,7 @@ def dump_obj(obj):
             print "skipping already-up-to-date %s" % jsonpath
             return
     print "writing %s" % jsonpath
-    json_data = to_json(obj.raw_data)
+    json_data = to_json(obj._rawData)  # .raw_data triggers reload
     print >>open(jsonpath, "w"), json_data
     return relpath, jsonpath
 
