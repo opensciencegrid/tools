@@ -14,3 +14,7 @@ cd $ghmdir
 $srcdir/ghb.py opensciencegrid $ghmdir/token >$logdir/ghmeta_backup.log \
                                             2>$logdir/ghmeta_backup.err
 
+cd repos/
+[[ -d .git ]] || git init
+git add .
+git commit -qm auto-bak
