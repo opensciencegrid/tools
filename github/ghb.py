@@ -57,7 +57,7 @@ def dump_repo(repo):
     dump_updated_obj_items(repo, "issues_comments")
     dump_updated_obj_items(repo, "pulls_comments")
     dump_updated_obj_items(repo, "releases")
-    dump_updated_obj_items(repo, "pulls", nest="reviews")
+    dump_updated_obj_items(repo, "pulls", state='all', nest="reviews")
 
 def dump_updated_obj_items(obj, gettername, nest=None, **igkw):
     upd_path = "%s/%s.ts" % (rel_url_path(obj.url), gettername)
