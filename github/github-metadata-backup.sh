@@ -17,4 +17,7 @@ $srcdir/ghb.py opensciencegrid $ghmdir/token >$logdir/ghmeta_backup.log \
 cd repos/
 [[ -d .git ]] || git init
 git add .
-git commit -qm auto-bak
+if [[ $(git status --porcelain) ]]; then
+  git commit -qm auto-bak
+fi
+
