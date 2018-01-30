@@ -53,7 +53,7 @@ PASS for USER is taken from the first of:
 Options:
   -H   show http response headers
   -F field[:field...] display fields for repos instead of just "html_url"
-     (valid fields are clone_url git_url html_url ssh_url full_name name)
+     (valid fields are clone_url git_url html_url ssh_url full_name name, etc)
 """ % s
     sys.exit()
 
@@ -64,8 +64,6 @@ PUT    = 'PUT'
 POST   = 'POST'
 PATCH  = 'PATCH'
 DELETE = 'DELETE'
-
-VALID_FIELDS = set('clone_url git_url html_url ssh_url full_name name'.split())
 
 class Options:
     authstr = None
@@ -319,7 +317,7 @@ def checkfields(f):
     if not f:
         usage()
     fields = f.split(':')
-    if not all( x in VALID_FIELDS for x in fields ):
+    if not all( re.search(r'^\w+$', x) for x in fields ):
         usage()
     return fields
 
