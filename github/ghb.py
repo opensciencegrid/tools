@@ -56,11 +56,13 @@ def dump_org_repos(org):
 
 def dump_repo(repo):
     dump_obj(repo)
-    dump_updated_obj_items(repo, "issues", state='all')
+    updated_issues = dump_updated_obj_items(repo, "issues", state='all')
+    updated_pulls = [ repo.get_pull(ui.number) for ui in updated_issues
+                      if 'pull_request' in ui._rawData ]
+    dump_items(updated_pulls, nest="reviews")
     dump_updated_obj_items(repo, "issues_comments")
     dump_updated_obj_items(repo, "pulls_comments")
     dump_updated_obj_items(repo, "releases")
-    dump_updated_obj_items(repo, "pulls", state='all', nest="reviews")
 
 def dump_updated_obj_items(obj, gettername, nest=None, **igkw):
     updated_at_path = "%s/%s.ts" % (rel_url_path(obj.url), gettername)
@@ -68,16 +70,21 @@ def dump_updated_obj_items(obj, gettername, nest=None, **igkw):
     kw = get_since_kw(updated_at_path, itemgetter)
     kw.update(igkw)
     items = list(itemgetter(**kw))
-    for item in items:
-        if dump_obj(item) and nest:
+    return dump_items(items, updated_at_path, nest, 'since' in kw)
+
+def dump_items(items, updated_at_path=None, nest=None, want_since=False):
+    updated_items = filter(dump_obj, items)
+    if nest:
+        for item in updated_items:
             dump_updated_obj_items(item, nest)
-    if items and 'since' in kw:
+    if updated_items and want_since:
         if hasattr(items[0], 'updated_at'):
             last_update = max( i.updated_at for i in items )
             print "writing %s" % updated_at_path
             print >>open(updated_at_path, 'w'), datetime_to_raw(last_update)
-    else:
+    elif updated_at_path:
         print "no new items for %s" % updated_at_path.replace('.ts', '')
+    return updated_items
 
 def get_since_kw(path, itemgetter):
     want_since = ':param since:' in itemgetter.__doc__  # yikes...
