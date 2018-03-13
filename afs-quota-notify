@@ -130,7 +130,15 @@ def main(argv):
         print(USAGE)
         return 2
 
-    config_fp = open(args[0], 'r') if len(args) > 0 else StringIO(DEFAULT_CONFIG)
+    config_text = "Using default config"
+    if len(args) > 0:
+        filename = os.path.realpath(args[0])
+        if filename.startswith("/afs/cs.wisc.edu"):
+            filename = filename[16:]
+        config_fp = open(filename, 'r')
+        config_text = "Using config at " + filename
+    else:
+        config_fp = StringIO(DEFAULT_CONFIG)
     directories, email, threshold = read_config(config_fp)
     config_fp.close()
 
@@ -154,7 +162,7 @@ def main(argv):
 
     dir_column_width = max([len(d) for d in directories])
 
-    msg_text = ""
+    msg_text = config_text + "\n\n"
     msg_subject = "AFS quota monitor: "
 
     warning_count = 0
