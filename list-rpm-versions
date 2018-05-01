@@ -164,7 +164,12 @@ def print_table(header, table):
         print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
 
 def single_output_pkg_vrs(output, want_pkgs):
-    have_rpms = nvrmap(output)
+    try:
+        have_rpms = nvrmap(output)
+    except RuntimeError as e:
+        print >>sys.stderr, "WARNING:", e
+        print >>sys.stderr
+        return []
 
     # arch-stripped rpm names
     if strip_arch:
