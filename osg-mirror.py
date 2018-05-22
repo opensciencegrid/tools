@@ -14,8 +14,8 @@ from time import clock, ctime, sleep, time
 
 REPOS_ROOT = "/p/vdt/public/html/repos"
 #REPOS_ROOT = "/scratch/matyas/repos"
-GOC_ROOT = "rsync://repo.grid.iu.edu/osg"
-#GOC_ROOT = "rsync://repo-itb.grid.iu.edu/osg"
+GOC_ROOT = "rsync://repo.opensciencegrid.org/osg"
+#GOC_ROOT = "rsync://repo-itb.opensciencegrid.org/osg"
 LOCK_RETRY_MAX = 60 * 20
 GLOBAL_TIMEOUT = 60 * 119 # 2 hours
 

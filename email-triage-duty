@@ -93,8 +93,7 @@ This week: %s
 Next week: %s
 
 More information at:
-https://twiki.grid.iu.edu/bin/view/SoftwareTeam/TriageDuty
-https://twiki.grid.iu.edu/bin/view/SoftwareTeam/SoftwareSupport
+https://opensciencegrid.org/technology/policy/software-support/
 """ % (triage_today, triage_next_week)
     
     return (subject, body)

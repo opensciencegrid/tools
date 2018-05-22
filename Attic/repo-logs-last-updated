@@ -3,7 +3,7 @@
 # reports age of oldest update-repo log for each repo* server
 
 repo_log_timestamps () {
-  wget -qO- "http://${1}.grid.iu.edu/web/log/?C=M;O=A" |
+  wget -qO- "http://${1}.opensciencegrid.org/web/log/?C=M;O=A" |
   perl -lne '
     @f = m{<td.*?>(.*?)</td>}g;
     ($log,$ts) = @f[1,2];

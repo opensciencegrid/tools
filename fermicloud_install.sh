@@ -54,7 +54,7 @@ HADOOP_MNT="/mnt/hadoop"
 echo "Installing repos..."
 rpm -Uvh http://dl.fedoraproject.org/pub/epel/5/i386/epel-release-5-4.noarch.rpm
 yum -y install yum-priorities
-rpm -Uvh http://repo.grid.iu.edu/osg-release-latest.rpm
+rpm -Uvh http://repo.opensciencegrid.org/osg-release-latest.rpm
 
 echo "Creating users..."
 getent passwd osg >/dev/null || useradd -g osg osg
