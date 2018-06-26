@@ -40,13 +40,15 @@ $ list-rpm-versions --help
 
 Usage:
   list-rpm-versions [options] output-001 [packages...]
-  list-rpm-versions [options] --summarize [run-]20161220-1618 packages...
+  list-rpm-versions [options] [--summarize] [run-]20161220-1618 packages...
+  list-rpm-versions [options] VMU-RESULTS-URL packages...
 
 List version-release numbers for RPMs installed in an osg-test run output
 directory, as found in output-NNN/output/osg-test-*.log
 
 The output argument can also be a root.log from a koji/mock build,
-or the raw output of an 'rpm -qa' command.
+or the raw output of an 'rpm -qa' command, or an osg-profile.txt from
+osg-system-profiler.
 
 If any packages are specified, limit the results to just those packages.
 
@@ -54,11 +56,19 @@ If a run directory (or, just the timstamp string) is specified, summary
 information will be printed for the listed packages across all output-NNN
 subdirectories for that set of osg test runs.
 
+If a VMU-RESULTS-URL is provided, the corresponding run dir will be used.
+Eg: "http://vdt.cs.wisc.edu/tests/20180604-1516/005/osg-test-20180604.log"
+for an individual output job (005),
+or: "http://vdt.cs.wisc.edu/tests/20180604-1516/packages.html"
+for a summary of all jobs for the run.
+
 Options:
   -A, --no-strip-arch  don't attempt to strip .arch from package names
   -D, --no-strip-dist  don't attempt to strip .dist tag from package releases
 
   -s, --summarize      summarize results for all output subdirs
+                       (this option is implied if the argument specified is of
+                       the format [run-]YYYYMMDD-HHMM)
   -l, --list-outputs   list output numbers (summarize mode only)
   -L, --max-outputs N  list at most N output numbers per NVR (-1 for unlimited)
 ```
