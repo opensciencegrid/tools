@@ -77,6 +77,7 @@ safetags () {
 email_errors () {
     { echo "Errors detected for backup run at $(date)."
       echo
+      echo "See /p/condor/workspaces/vdt/git/doc/error-recovery-notes.txt for instructions."
       echo ---
       echo
       cat $tmpd/backups.log
