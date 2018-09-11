@@ -4,7 +4,7 @@ topdir=/p/condor/workspaces/vdt/git
 bakdir=$topdir/repo
 logdir=$topdir/log
 srcdir=$topdir/script
-lockfile=/nobackup/$(id -un)/.backups.lk
+lockfile=/tmp/$(id -un)/.gitbackups.lk
 
 # list file of git clone urls, path can be absolute or relative to bakdir
 git_remotes_listfile=remotes.list
