@@ -4,6 +4,7 @@ topdir=/p/condor/workspaces/vdt/git
 bakdir=$topdir/repo
 logdir=$topdir/log
 srcdir=$topdir/script
+lockfile=/tmp/$(id -un)/.gitbackups.lk
 
 # list file of git clone urls, path can be absolute or relative to bakdir
 git_remotes_listfile=remotes.list
@@ -90,8 +91,9 @@ trap 'rm -rf "$tmpd"' EXIT
 
 { # log all stdout/stderr from this section
 
+mkdir -p "$(dirname "$lockfile")"
 # attempt to acquire lock before doing fetches
-exec 99>> .backups.lk
+exec 99>> "$lockfile"
 
 if ! flock -n 99; then
     datelog 'Could not acquire lock (previous run still active) -' \
