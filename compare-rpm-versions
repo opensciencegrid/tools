@@ -31,8 +31,11 @@ dirs       = []
 strip_arch = True
 strip_dist = True
 
+GLOBAL_RUNS_DIR = "/osgtest/runs"
+
 arch_pat = r'\.(x86_64|i[3-6]86|noarch|src)$'
 dist_pat = r'((\.osg(\d+)?)?\.[es]l[5-9](_[\d.]+)?(\.centos)?|\.osg|\.fc\d+)$'
+vmurun_pat = r'(?:/|^)(20\d{6}-\d{4})/(\d\d\d+)(?:/|$)'
 
 def usage():
     print __doc__ % os.path.basename(__file__)
@@ -95,6 +98,10 @@ def rpm_qa2na_vr(line):
     return [na,vr]
 
 def nvrmap(output):
+    if not os.path.exists(output):
+        m = re.search(vmurun_pat, output)
+        if m:
+            output = GLOBAL_RUNS_DIR + "/run-%s/output-%s" % m.groups()
     if not isdir(output):
         log = output
     else:
