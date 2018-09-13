@@ -167,6 +167,10 @@ def colorize_vr(vr1, vr2):
 
     return map('-'.join, [[v1,r1],[v2,r2]])
 
+def pkgpath_tidy(path):
+    m = re.search(vmurun_pat, path)
+    return '%s/%s' % m.groups() if m else path
+
 pkg_diffs = []
 for pkg in sorted(all_rpms if show_all or show_miss else all_match_rpms):
     vr1 = rpms1.get(pkg) or '-'
@@ -174,8 +178,9 @@ for pkg in sorted(all_rpms if show_all or show_miss else all_match_rpms):
     if show_all or vr1 != vr2:
         pkg_diffs.append([pkg, vr1, vr2])
 
+titles = map(pkgpath_tidy, dirs)
 if pkg_diffs:
-    pkg_diffs[:0] = [["Package"] + dirs]
+    pkg_diffs[:0] = [["Package"] + titles]
     widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
     pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
     for i,row in enumerate(pkg_diffs):
