@@ -42,6 +42,7 @@ COMMANDs:
   (*)   merge-pr         OWNER REPO NUMBER
   (*)   close-pr         OWNER REPO NUMBER
   (*)   list-hooks       OWNER REPO
+  (*)   ping-hook        OWNER REPO HOOK_ID
         
 (*) USER login required
 
@@ -167,6 +168,7 @@ github API notes:
 : close-pr       PATCH /repos/:owner/:repo/pulls/:number {"state": "closed"}
 : list-prs       GET /repos/:owner/:repo/pulls
 : list-hooks     GET /repos/:owner/:repo/hooks
+: ping-hook      POST /repos/:owner/:repo/hooks/:hook_id/pings
 """
 
 def print_names(seq):
@@ -298,6 +300,9 @@ def request_pull(owner, baserepo, frombranch, title, body):
 def list_hooks(owner, repo):
     print_hook_info(snarfer(GET, '/repos/%s/%s/hooks' % (owner, repo)))
 
+def ping_hook(owner, repo, hook_id):
+    snarfer(POST, "/repos/%s/%s/hooks/%s/pings" % (owner, repo, hook_id))
+
 methods = {
 #   'command-name':     [method,   user_required],
     'list-mine':        [list_mine,        True],
@@ -322,6 +327,7 @@ methods = {
     'merge-pr':         [merge_pr,         True],
     'close-pr':         [close_pr,         True],
     'list-hooks':       [list_hooks,       True],
+    'ping-hook':        [ping_hook,        True],
 }
 
 def checkfields(f):
