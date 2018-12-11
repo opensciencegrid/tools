@@ -175,12 +175,12 @@ def print_names(seq):
 def print_fields(seq):
     rows = sorted( [ x[f] for f in options.listfields ] for x in seq )
     for row in rows:
-        print '\t'.join(row)
+        print '\t'.join(map(str, row))
 
 def print_fields_sortby(seq, fields, sortby):
     rows = sorted( [x[sortby]] + [ x[f] for f in fields ] for x in seq )
     for row in rows:
-        print '\t'.join(row[1:])
+        print '\t'.join(map(str, row[1:]))
 
 def print_refs(seq):
     for x in seq:
