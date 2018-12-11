@@ -41,6 +41,7 @@ COMMANDs:
   (*)   request-pull     OWNER REPO[:BRANCH] [USER:]BRANCH TITLE BODY
   (*)   merge-pr         OWNER REPO NUMBER
   (*)   close-pr         OWNER REPO NUMBER
+  (*)   list-hooks       OWNER REPO
         
 (*) USER login required
 
@@ -165,6 +166,7 @@ github API notes:
                  # {"commit_title": "title", "commit_message": "desc"}
 : close-pr       PATCH /repos/:owner/:repo/pulls/:number {"state": "closed"}
 : list-prs       GET /repos/:owner/:repo/pulls
+: list-hooks     GET /repos/:owner/:repo/hooks
 """
 
 def print_names(seq):
@@ -197,6 +199,11 @@ def dump_infos(seq):
         for xk,xv in sorted(x.items()):
             print "  - %*s: %s" % (w,xk,xv)
         print
+
+def print_hook_info(seq):
+    for hook in seq:
+        print "%s: [%s] -> %s" % (hook['id'], ' | '.join(hook['events']),
+                                  hook['config']['url'])
 
 def pmsg(j):
     if j and 'message' in j:
@@ -288,6 +295,9 @@ def request_pull(owner, baserepo, frombranch, title, body):
     print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo),
            {"title": title, "body": body, "head": head, "base": basebranch})])
 
+def list_hooks(owner, repo):
+    print_hook_info(snarfer(GET, '/repos/%s/%s/hooks' % (owner, repo)))
+
 methods = {
 #   'command-name':     [method,   user_required],
     'list-mine':        [list_mine,        True],
@@ -310,7 +320,8 @@ methods = {
     'request-pull':     [request_pull,     True],
     'list-prs':         [list_prs,         False],
     'merge-pr':         [merge_pr,         True],
-    'close-pr':         [close_pr,         True]
+    'close-pr':         [close_pr,         True],
+    'list-hooks':       [list_hooks,       True],
 }
 
 def checkfields(f):
