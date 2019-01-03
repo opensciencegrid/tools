@@ -10,7 +10,7 @@ lockfile=/tmp/$(id -un)/.gitbackups.lk
 git_remotes_listfile=remotes.list
 
 email_from=cndrutil@cs.wisc.edu
-email_to="edquist@cs.wisc.edu matyas+cron@cs.wisc.edu tim@cs.wisc.edu blin@cs.wisc.edu cat@cs.wisc.edu bbockelm@cse.unl.edu"
+email_to="edquist@cs.wisc.edu matyas+cron@cs.wisc.edu tim@cs.wisc.edu blin@cs.wisc.edu cat@cs.wisc.edu brian.bockelman@cern.ch"
 
 datelog () {
   echo "$(date): $*"
