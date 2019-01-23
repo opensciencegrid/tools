@@ -147,11 +147,20 @@ def rpm_qa2na_vr(line):
     return [na,vr]
 
 def scrape_installed_packages(txt):
-    items_pat = (r'^(?:Dependency )?(?:Installed|Updated|Replaced):\n'
+    installed_pkgs = {}
+    items_pat = (r'^(?:Dependency )?(Installed|Updated|Replaced):\n'
                  r'(.*?)\n(?:\n|(?=[^ ]))')
-    # split this way since there can be more than one item per line
-    items = ' '.join(re.findall(items_pat, txt, re.S | re.M)).split()
-    return dict(nvrgen(items))
+    for section, pkgtxt in re.findall(items_pat, txt, re.S | re.M):
+        pkg_items = pkgtxt.split()
+        if section == 'Replaced':
+            # package was removed / obsoleted by another package
+            for na,evr in nvrgen(pkg_items):
+                if installed_pkgs.get(na) == evr:
+                    del installed_pkgs[na]
+        else:
+            # package was installed/updated
+            installed_pkgs.update(nvrgen(pkg_items))
+    return installed_pkgs
 
 def nvrmap(output):
     if not os.path.isdir(output):
