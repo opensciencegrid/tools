@@ -146,6 +146,22 @@ def rpm_qa2na_vr(line):
     vr = '-'.join((v,r))
     return [na,vr]
 
+def scrape_installed_packages(txt):
+    installed_pkgs = {}
+    items_pat = (r'^(?:Dependency )?(Installed|Updated|Replaced):\n'
+                 r'(.*?)\n(?:\n|(?=[^ ]))')
+    for section, pkgtxt in re.findall(items_pat, txt, re.S | re.M):
+        pkg_items = pkgtxt.split()
+        if section == 'Replaced':
+            # package was removed / obsoleted by another package
+            for na,evr in nvrgen(pkg_items):
+                if installed_pkgs.get(na) == evr:
+                    del installed_pkgs[na]
+        else:
+            # package was installed/updated
+            installed_pkgs.update(nvrgen(pkg_items))
+    return installed_pkgs
+
 def nvrmap(output):
     if not os.path.isdir(output):
         log = output
@@ -170,11 +186,7 @@ def nvrmap(output):
         txt = re.sub(r'\n[A-Z]+ .*?:\d+:  ', r'\n', txt)
         # don't include Install list from cleanup/downgrade
         txt = re.sub(r'\nosgtest: .* special_cleanup[\d\D]*', r'\n', txt)
-        items_pat = (r'^(?:Dependency )?(?:Installed|Updated|Replaced):\n'
-                     r'(.*?)\n(?:\n|(?=[^ ]))')
-        # split this way since there can be more than one item per line
-        items = ' '.join(re.findall(items_pat, txt, re.S | re.M)).split()
-        return dict(nvrgen(items))
+        return scrape_installed_packages(txt)
     else:
         # at most 1-word per line; assume this is 'rpm -qa' output
         return dict(map(rpm_qa2na_vr, txt.split()))
