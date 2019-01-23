@@ -52,6 +52,9 @@ osg-system-profiler.
 
 If any packages are specified, limit the results to just those packages.
 
+Patterns can be specified for package names with the '%' character, which
+matches like '*' in a shell glob pattern.
+
 If a run directory (or, just the timstamp string) is specified, summary
 information will be printed for the listed packages across all output-NNN
 subdirectories for that set of osg test runs.

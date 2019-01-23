@@ -15,6 +15,9 @@ osg-system-profiler.
 
 If any packages are specified, limit the results to just those packages.
 
+Patterns can be specified for package names with the '%' character, which
+matches like '*' in a shell glob pattern.
+
 If a run directory (or, just the timstamp string) is specified, summary
 information will be printed for the listed packages across all output-NNN
 subdirectories for that set of osg test runs.
@@ -38,6 +41,7 @@ Options:
 
 import collections
 import itertools
+import fnmatch
 import getopt
 import pickle
 import glob
@@ -197,8 +201,13 @@ def single_output_pkg_vrs(output, want_pkgs):
     else:
         have_pkgs = set(map(arch_strip, have_rpms))
 
-    want_pkgs = set(want_pkgs)
+    want_pkg_pats = [ p.replace('%','*') for p in want_pkgs if '%' in p ]
+    want_pkgs = set( p for p in want_pkgs if '%' not in p )
     missing_pkgs = want_pkgs - have_pkgs
+    for pat in want_pkg_pats:
+        for pkg in have_pkgs:
+            if fnmatch.fnmatch(pkg, pat):
+                want_pkgs.add(pkg)
 
     if not want_pkgs:
         display_rpms = have_rpms
@@ -278,10 +287,19 @@ def summarize_outputs(rundir, pkgs):
     outputs = get_run_output_dirs(rundir)
 
     pkgstats = autodict()
+    pkgonums = autodict()
+    onums    = set()
     bgcalls = [ bgcall(single_output_pkg_vrs, o, pkgs) for o in outputs ]
     for get_pkg_vrs,output in zip(bgcalls, outputs):
+        onum = outputnum(output)
+        onums.add(onum)
         for pkg,vr in get_pkg_vrs():
-            pkgstats[pkg][vr] += [outputnum(output)]
+            pkgstats[pkg][vr] += [onum]
+            pkgonums[pkg]     += [onum]
+
+    for pkg in pkgonums:
+        for onum in onums - set(pkgonums[pkg]):
+            pkgstats[pkg]['-'] += [onum]
 
     header = get_summary_header()
     separator = [''] * len(header)
