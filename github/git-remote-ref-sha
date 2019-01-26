@@ -1,0 +1,46 @@
+#!/usr/bin/python
+
+# retrieve sha for remote refname -- a wrapper around git-ls-remote
+
+from __future__ import print_function
+import subprocess
+import sys
+import os
+
+def group_adjacent(seq, n):
+    ''' group_adjacent([1,2,3,4,5,6], 3) -> [(1,2,3), (4,5,6)] '''
+    return zip(*([iter(seq)] * n))
+
+def get_remote_refmap(remote):
+    output = subprocess.check_output(['git', 'ls-remote', remote])
+    return dict( (ref,sha) for sha,ref in group_adjacent(output.split(), 2) )
+
+def lookup_ref(refmap, ref):
+    testrefs = [ref, "refs/" + ref, "refs/tags/" + ref, "refs/heads/" + ref]
+    for testref in testrefs:
+        if testref in refmap:
+            return refmap[testref], testref
+
+def usage():
+    print("Usage: %s remote refname\n\n"
+          "Parameters:\n"
+          "  remote:  a git repo url, or a locally configured remote name\n"
+          "  refname: a tag or branch name, or a full refname (refs/...)"
+          % os.path.basename(__file__))
+    sys.exit(0)
+
+def main(args):
+    len(args) == 2 or usage()
+    remote, refname = args
+    refmap = get_remote_refmap(remote)
+    sha, ref = lookup_ref(refmap, refname)
+    if sha:
+        print("%s\t%s" % (sha, ref))
+    else:
+        print("No ref matching '%s' found for remote '%s'" % (refname, remote),
+              file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
+
