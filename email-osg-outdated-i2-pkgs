@@ -1,0 +1,35 @@
+#!/bin/bash
+
+tools=/p/condor/workspaces/vdt/tools
+
+export PATH+=:/p/condor/workspaces/vdt/osg-build
+
+FROM=cndrutil@cs.wisc.edu
+REPLYTO=osg-software@opensciencegrid.org
+TO=osg-software@opensciencegrid.org
+
+check_for_el () {
+  EL=$1
+  OSG=3.4
+
+  DATE=$(date +%F)
+  subject="OSG $OSG packages behind Internet2 versions (el$EL)"
+  preamble=(OSG $OSG el$EL packages out-of-date with respect to Internet2 versions,
+            as of $DATE:)
+  {
+  {
+  echo "\
+From: $FROM
+Reply-To: $REPLYTO
+To: $TO
+MIME-Version: 1.0
+Content-Type: text/html
+Subject: $subject
+"
+  "$tools"/osg-outdated-i2-pkgs --html $OSG el$EL --preamble="${preamble[*]}"
+  } | /usr/sbin/sendmail -t
+  } </dev/null &>/dev/null &
+}
+
+check_for_el 6
+
