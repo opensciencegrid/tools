@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+
+# yet another koji rpm downloader
+
+usage () {
+  echo "$(basename "$0") KOJI_BUILD_NVR"
+  exit
+}
+
+[[ $1 ]] || usage
+[[ $1 != -* ]] || usage
+
+build=$1
+
+mkdir "$build"
+cd "$build"
+
+osg-koji buildinfo "$build" | sed -n '/^RPMs:/,$p' | sed 1d \
+| wget -B http://koji-hub.batlab.org -nv -i-
+
+echo
+echo "files left in: $build"
+
