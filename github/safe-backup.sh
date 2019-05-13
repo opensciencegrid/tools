@@ -5,6 +5,7 @@ bakdir=$topdir/repo
 logdir=$topdir/log
 srcdir=$topdir/script
 lockfile=/tmp/$(id -un)/.gitbackups.lk
+tsdir=/var/tmp/git-safe-backup
 
 # list file of git clone urls, path can be absolute or relative to bakdir
 git_remotes_listfile=remotes.list
@@ -91,6 +92,7 @@ trap 'rm -rf "$tmpd"' EXIT
 
 { # log all stdout/stderr from this section
 
+[[ -e $tsdir ]] || mkdir -m755 $tsdir
 mkdir -p "$(dirname "$lockfile")"
 # attempt to acquire lock before doing fetches
 exec 99>> "$lockfile"
@@ -125,14 +127,14 @@ if [[ -e $tmpd/failures-detected ]]; then
     # send error email if our last failure email was sent more than
     # a day ago, or if there was a successful run since then
     touch -d "$(date -d '1 day ago')" $tmpd/yesterday-mtime
-    if [[ last-failure-email-mtime -ot $tmpd/yesterday-mtime ||
-          last-failure-email-mtime -ot last-success-mtime    ]]; then
+    if [[ $tsdir/last-failure-email-mtime -ot $tmpd/yesterday-mtime     ||
+          $tsdir/last-failure-email-mtime -ot $tsdir/last-success-mtime ]]; then
         email_errors 99>&-  # don't pass lock fd to mailer
-        touch last-failure-email-mtime
+        touch $tsdir/last-failure-email-mtime
     fi
-    cp $tmpd/backups.log last-failure-msg
+    cp $tmpd/backups.log $tsdir/last-failure-msg
 else
-    touch last-success-mtime
+    touch $tsdir/last-success-mtime
 fi
 
 /usr/sbin/logrotate --state $logdir/.logrotate.state $srcdir/backups.logrotate
