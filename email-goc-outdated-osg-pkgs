@@ -13,8 +13,8 @@ check_for_el () {
   OSG=$2
 
   DATE=$(date +%F)
-  subject="GOC $EL packages behind OSG $OSG versions"
-  preamble=(GOC $EL packages out-of-date with respect to
+  subject="EL$EL GOC packages behind OSG $OSG versions"
+  preamble=(EL$EL GOC packages out-of-date with respect to
             OSG $OSG versions, as of $DATE:)
   {
   {

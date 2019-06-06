@@ -163,7 +163,7 @@ for pkg in sorted(goc_map):
             pkg_diffs.append([pkg, goc_map[pkg], osg_map[pkg]])
 
 if pkg_diffs:
-    pkg_diffs[:0] = [["Package", "GOC " + EL, "OSG " + SERIES]]
+    pkg_diffs[:0] = [["Package", "EL%s GOC" % EL, "OSG " + SERIES]]
     widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
     pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
     for i,row in enumerate(pkg_diffs):
