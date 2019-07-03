@@ -1,0 +1,143 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Usage: %prog [options] OWNER/REPO
+where OWNER/REPO is e.g. "htcondor/htcondor-ce".
+-----
+Download the build products from a release of a GitHub repo.
+These are files that were uploaded using the GitHub releases API,
+for example by the deploy stage of a Travis-CI build.
+
+This does not download the source tarball or zip file that GitHub
+automatically makes for each release.
+"""
+from __future__ import print_function
+import json
+import optparse
+import os
+import pprint
+import sys
+
+try:
+    # Python 2
+    from urllib2 import urlopen
+    from urllib import urlretrieve
+    from urllib import quote as urlquote
+    from urllib import unquote as urlunquote
+    from urlparse import urlparse
+except ImportError:
+    # Python 3
+    from urllib.request import urlopen, urlretrieve
+    from urllib.parse import quote as urlquote
+    from urllib.parse import unquote as urlunquote
+    from urllib.parse import urlparse
+
+
+class Error(Exception): pass
+
+
+def download_to_file(url, filename):
+    """download from a url to a file.
+
+    Returns: (err, filesize) where:
+    - `err` is None or a string describing the error
+    - `filesize` is the number of bytes written.
+
+    """
+    try:
+        _, headers = urlretrieve(url, filename)
+    except EnvironmentError as err:
+        return str(err), 0
+
+    return None, int(headers["content-length"])
+
+
+def query_github(path):
+    """Perform an HTTP GET query to an api.github.com endpoint, expecting a JSON response.
+
+    Returns the parsed JSON.
+
+    """
+    url = "https://api.github.com/" + path
+
+    try:
+        handle = urlopen(url)
+        response_raw = handle.read()
+    except EnvironmentError as err:
+        raise Error("Unable to query %s: %s" % (url, err))
+
+    try:
+        response = json.loads(response_raw)
+    except (TypeError, ValueError) as e:
+        raise Error("Response couldn't be parsed as JSON:\n%s\n\nError was:%s" % (response_raw, e))
+
+    return response
+
+
+def main(argv):
+    usage, description = __doc__.split("\n-----\n", 1)
+    parser = optparse.OptionParser(usage=usage, description=description)
+    parser.add_option("--tag", metavar="GIT_TAG", help="The Git tag of the release (will use the latest release if not specified).")
+
+    options, args = parser.parse_args(argv[1:])
+
+    try:
+        owner, repo = args[0].split("/", 1)
+    except (IndexError, TypeError, ValueError):
+        parser.error("repo must be in OWNER/REPO format, e.g. 'htcondor/htcondor-ce'")
+
+    path = "repos/%s/%s/releases" % (urlquote(owner), urlquote(repo))
+    if not options.tag:
+        path += "/latest"
+
+    response = query_github(path)
+
+    release = None
+    try:
+        # We've gotten multiple releases. Filter by tag_name to select one.
+        if isinstance(response, list):
+            for rel in response:
+                if rel.get("tag_name") == args.tag:
+                    release = rel
+                    break
+            else:
+                raise Error("Release with tag name %s not found" % args.tag)
+        else:
+            release = response
+
+        assets = release.get("assets")
+        if not assets:
+            raise Error("No assets found in release")
+    except (TypeError, KeyError):
+        raise Error("Unexpected output from GitHub. Parsed output was:\n%s" %
+                    pprint.pformat(response))
+
+    try:
+        urls = [a["browser_download_url"] for a in assets]
+    except KeyError:
+        raise Error("Missing URL for asset. Assets:\n%s" % pprint.pformat(assets))
+
+    errors = []
+    for url in urls:
+        filename = os.path.basename(urlunquote(urlparse(url).path))
+        sys.stdout.write(filename.ljust(60))
+        sys.stdout.flush()
+        err, filesize = download_to_file(url, filename)
+        if err:
+            errors.append((url, err))
+            sys.stdout.write(" ERROR\n")
+        else:
+            sys.stdout.write(" ok    %5d KB\n" % (filesize // 1024))
+
+    if errors:
+        sys.stderr.write("Errors:\n")
+        for url, err in errors:
+            sys.stderr.write("%s: %s\n" % (url, err))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    try:
+        main(sys.argv)
+    except Error as e:
+        sys.exit(str(e))
+
