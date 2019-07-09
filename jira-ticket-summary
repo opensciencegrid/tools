@@ -1,11 +1,9 @@
 #!/usr/bin/python
 
-# Originally written by Carl Edquist; hacked to bits by Tim Cartwright.
-
 import re
 import smtplib
 import time
-import urllib2
+from jira.client import JIRA
 
 FROM = 'Tim Cartwright <cat@cs.wisc.edu>'
 RECIPIENTS = (
@@ -13,9 +11,12 @@ RECIPIENTS = (
     'Brian Lin <blin@cs.wisc.edu>',
     'Mat Selmeci <matyas+cron@cs.wisc.edu>',
 )
+PROJECT = 'SOFTWARE'
+STATUSES = ('Open', 'In Progress', 'Ready for Testing', 'Ready for Release')
+URL = 'https://opensciencegrid.atlassian.net'
 
-HEADERS = ('Open', 'In Progress', 'Ready for Testing', 'Ready for Release')
-URL = 'http://opensciencegrid.atlassian.net/projects/SOFTWARE/summary/statistics'
+jira = JIRA(URL)
+
 
 # Adapted from Mat's aggregator/emailer.py script
 def mail_message(subject, message, recipients):
@@ -28,15 +29,16 @@ def mail_message(subject, message, recipients):
     smtp.sendmail(from_addr, recipients, payload)
     smtp.quit()
 
-html = urllib2.urlopen(URL).read()
+
+def project_status_total(project, status):
+    search = 'project = {} AND status = "{}"'.format(project, status)
+    return jira.search_issues(search, maxResults=0).total
+
 
 text = 'JIRA Software tickets:\n\n'
-for h in HEADERS:
-    m = re.search(r'>%s<.*?<td class="cell-type-collapsed">(\d+)</td>' % h, html, re.S)
-    if m:
-        text += '    * %s: %s ()\n' % (h, m.groups()[0])
-    else:
-        text += '    * %s: 0 ()\n' % (h)
+for status in STATUSES:
+    count = project_status_total(PROJECT, status)
+    text += '    * %s: %s ()\n' % (status, count)
 text += '\n'
 text += 'Completed at %s\n' % (time.strftime('%Y-%m-%d %H:%M'))
 
