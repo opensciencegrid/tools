@@ -7,18 +7,23 @@ import smtplib
 import time
 import urllib2
 
-RECIPIENTS = ('Tim Cartwright <cat@cs.wisc.edu>', 'Brian Lin <blin@cs.wisc.edu>', 'Mat Selmeci <matyas+cron@cs.wisc.edu>')
+FROM = 'Tim Cartwright <cat@cs.wisc.edu>'
+RECIPIENTS = (
+    'Tim Cartwright <cat@cs.wisc.edu>',
+    'Brian Lin <blin@cs.wisc.edu>',
+    'Mat Selmeci <matyas+cron@cs.wisc.edu>',
+)
+
 HEADERS = ('Open', 'In Progress', 'Ready for Testing', 'Ready for Release')
 URL = 'http://opensciencegrid.atlassian.net/projects/SOFTWARE/summary/statistics'
 
 # Adapted from Mat's aggregator/emailer.py script
 def mail_message(subject, message, recipients):
-    from_addr = 'Tim Cartwright <cat@cs.wisc.edu>'
-    payload = 'Subject: %s\r\n' % (subject)
-    payload += 'From: %s\r\n' % (from_addr)
-    payload += 'To: %s\r\n' % (', '.join(recipients))
-    payload += '\r\n'
-    payload += message
+    payload = ( 'Subject: %s\r\n' % subject
+            +   'From: %s\r\n' % FROM
+            +   'To: %s\r\n' % ', '.join(recipients)
+            +   '\r\n'
+            +   message )
     smtp = smtplib.SMTP('localhost')
     smtp.sendmail(from_addr, recipients, payload)
     smtp.quit()
