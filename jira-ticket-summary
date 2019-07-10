@@ -5,7 +5,7 @@ import smtplib
 import time
 from jira.client import JIRA
 
-FROM = 'Tim Cartwright <cat@cs.wisc.edu>'
+FROM = 'JIRA Ticket Summary <cndrutil@cs.wisc.edu>'
 RECIPIENTS = (
     'Tim Cartwright <cat@cs.wisc.edu>',
     'Brian Lin <blin@cs.wisc.edu>',
