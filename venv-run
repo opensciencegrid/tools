@@ -1,0 +1,16 @@
+#!/bin/bash
+set -e
+
+usage () {
+  echo "usage: $(basename "$0") venv-dir python-script [args...]" >&2
+  echo
+  echo "Run python-script under venv environment."
+  exit 1
+}
+
+[[ -d $1 ]] || usage
+
+. "$1"/bin/activate
+shift
+python "$@"
+
