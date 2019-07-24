@@ -26,7 +26,7 @@ def mail_message(subject, message, recipients):
             +   '\r\n'
             +   message )
     smtp = smtplib.SMTP('localhost')
-    smtp.sendmail(from_addr, recipients, payload)
+    smtp.sendmail(FROM, recipients, payload)
     smtp.quit()
 
 
