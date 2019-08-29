@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+
+# dump .spec files for all packaging subdirs into current dir
+
+# run from redhat/native/trunk or redhat/native/branches/*/
+
+# can optionally run with make options, eg, -j8
+
+PKGS  := $(sort $(wildcard */))
+SPECS := $(PKGS:%/=%.spec)
+
+ifdef Q
+OP = -q
+else ifdef V
+OP = -v
+endif
+
+all: $(SPECS)
+
+$(PKGS): %/: %.spec
+
+%.spec:
+	@echo "> $@"
+	@cp $*/osg/$@ . 2>/dev/null || \
+	{ osg-build prebuild $(OP) $*/ && cp $*/_final_srpm_contents/*.spec $@; }
+
+clean:
+	rm -f $(SPECS)
+	rm -rf $(SPECS:%.spec=%/_final_srpm_contents/)
+
+.PHONY: $(PKGS) clean
+
