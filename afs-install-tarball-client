@@ -26,13 +26,10 @@ main () {
     # @sys AFS magic to point to the dir that's appropriate for the system
     ln -s '@sys' $VR/sys
 
-    if test $MajorVersion = 3.1 || test $MajorVersion = 3.2; then
-        install_tarball osg-client i386_rhel5 el5 i386
-        install_tarball osg-client amd64_rhel6 el6 x86_64
-    else
+    if test $MajorVersion = 3.4; then
         install_tarball osg-afs-client amd64_rhel6 el6 x86_64
-        install_tarball osg-afs-client amd64_rhel7 el7 x86_64
     fi
+    install_tarball osg-afs-client amd64_rhel7 el7 x86_64
 
     newline
     newline
