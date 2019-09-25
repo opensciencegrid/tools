@@ -1,0 +1,67 @@
+#!/bin/bash
+set -e
+
+PKG=${PKG:-condor}
+
+usage () {
+  echo "usage: $(basename "$0") [-x] upstream-path1 upstream-path2 $PKG.spec"
+  echo "   or: $(basename "$0") [-x] version1 version2 $PKG.spec"
+  echo
+  echo "   eg: $(basename "$0") $PKG/8.3.8/$PKG-8.3.8-1.src.rpm \\"
+  echo "                           $PKG/8.4.0/$PKG-8.4.0-1.src.rpm \\"
+  echo "                           osg/$PKG.spec"
+  echo
+  echo "   or: $(basename "$0") 8.3.8 8.4.0 $PKG.spec"
+  echo
+  echo "attempt to merge changes into combined/$PKG.spec"
+  echo "use '-x' to 'rm -rf combined' first."
+  echo
+  echo "can set \$PKG in environment for an alternate package name (than $PKG)"
+  exit
+}
+
+if [[ $1 = -x ]]; then
+  rm -rf combined
+  shift
+fi
+[[ $# = 3 ]] || usage
+
+upstream=/p/vdt/public/html/upstream
+
+mkdir combined
+echo "writing to 'combined' ..."
+
+osgspec=$(readlink -f "$3")
+
+cd combined/
+
+ups1=$1
+ups2=$2
+
+[[ $ups1 = */*/*.rpm ]] || ups1=$PKG/$ups1/$PKG-$ups1-1.src.rpm
+[[ $ups2 = */*/*.rpm ]] || ups2=$PKG/$ups2/$PKG-$ups2-1.src.rpm
+
+#v1=${ups1%/*} v1=${v1#*/}
+#v2=${ups2%/*} v2=${v2#*/}
+
+v1=${ups1%.src.rpm} v1=${v1#*/$PKG-}
+v2=${ups2%.src.rpm} v2=${v2#*/$PKG-}
+
+git init
+echo "** Adding $v1 $PKG.spec **"
+rpm2cpio "$upstream/$ups1" | cpio -i $PKG.spec
+git add $PKG.spec
+git commit -m "$ups1 - $PKG.spec"
+git branch "$v1"
+git branch "$v2"
+echo "** Adding osg $PKG.spec **"
+cp "$osgspec" .
+git commit -am "osg - $PKG.spec"
+git checkout "$v2"
+echo "** Adding $v2 $PKG.spec **"
+rpm2cpio "$upstream/$ups2" | cpio -iu $PKG.spec
+git commit -am "$ups2 - $PKG.spec"
+git checkout master
+git merge "$v2" || bash
+gitk --all
+
