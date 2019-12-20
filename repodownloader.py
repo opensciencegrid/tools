@@ -187,7 +187,7 @@ def main(argv):
         log.addHandler(filehandler)
 
     # Set the log level
-    loglevel = min(logging.DEBUG, logging.WARNING + 10 * (args.quiet - args.verbose))
+    loglevel = max(logging.DEBUG, logging.WARNING + 10 * (args.quiet - args.verbose))
     log.setLevel(loglevel)
 
     try:
