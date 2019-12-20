@@ -151,6 +151,11 @@ def main(argv):
     parser.add_argument(
         "--logfile", metavar="PATH", default=None, help="Path to logfile"
     )
+    parser.add_argument(
+        "--subject",
+        default=argv[0],
+        help="Subject to prefix notification email with; default: %(default)s",
+    )
     args = parser.parse_args(argv[1:])
 
     # Set up logging for email: log temporarily into a string and send it at the
@@ -180,10 +185,10 @@ def main(argv):
 
     if ret != 0:
         if args.notify:
-            send_email(args.notify, "%s failed" % parser.prog, logstream.getvalue())
+            send_email(args.notify, "%s: FAIL" % args.subject, logstream.getvalue())
     elif args.notify_on_success:
         if args.notify:
-            send_email(args.notify, "%s succeeded" % parser.prog, logstream.getvalue())
+            send_email(args.notify, "%s: ok" % args.subject, logstream.getvalue())
 
     return ret
 
