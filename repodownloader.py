@@ -93,11 +93,22 @@ def git_clone_or_pull(repo, directory, branch):
 
     """
     if not os.path.exists(directory):
+        log.info(
+            "Making initial repo clone from %s to %s; using branch %s",
+            repo,
+            directory,
+            branch,
+        )
         ok = run_git_command(["clone", repo, directory])
         ok = ok and run_git_command(["checkout", branch], directory=directory)
         return ok
 
     if os.path.exists(os.path.join(directory, ".git")):
+        log.info(
+            "Cleaning and updating %s to the latest branch %s from origin",
+            directory,
+            branch,
+        )
         _ = run_git_command(["clean", "-df"], directory=directory)
         ok = run_git_command(["fetch", "origin"], directory=directory)
         ok = ok and run_git_command(
@@ -105,7 +116,9 @@ def git_clone_or_pull(repo, directory, branch):
         )
         return ok
 
-    log.error("%s already exists but is not a git repository", directory)
+    log.error(
+        "%s already exists but is not a git repository; not touching it.", directory
+    )
     return False
 
 
@@ -184,9 +197,11 @@ def main(argv):
         ret = 99
 
     if ret != 0:
+        log.info("Update failed")
         if args.notify:
             send_email(args.notify, "%s: FAIL" % args.subject, logstream.getvalue())
     elif args.notify_on_success:
+        log.info("Update succeeded")
         if args.notify:
             send_email(args.notify, "%s: ok" % args.subject, logstream.getvalue())
 
