@@ -33,5 +33,5 @@ Subject: $subject
 
 check_for_el 6 3.4
 check_for_el 7 3.4
-check_for_el 7 goc
+check_for_el 7 devops
 
