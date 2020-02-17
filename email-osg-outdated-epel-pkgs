@@ -27,8 +27,16 @@ Content-Type: text/html
 Subject: $subject
 "
   "$tools"/osg-outdated-epel-pkgs --html $OSG el$EL --preamble="${preamble[*]}"
-  } | /usr/sbin/sendmail -t
+  } | hacky_pkg_blacklist | /usr/sbin/sendmail -t
   } </dev/null &>/dev/null &
+}
+
+hacky_pkg_blacklist () {
+  # Mat doesn't want to hear about koji or mash for osg 3.4
+  case $OSG in
+    3.4) egrep -vw '(koji|mash)' ;;
+     * ) cat ;;
+  esac
 }
 
 check_for_el 6 3.4
