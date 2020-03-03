@@ -141,12 +141,14 @@ def csbacktick(*args, **kwargs):
     return outerr
 
 
-def rsync_with_retry(src_path, remote_path, delete=None):
+def rsync_with_retry(src_path, remote_path, delete=None, logfile=None):
     rsync_opts = [
         "--recursive",
         "--stats",
-        "--rsh=ssh -i %s" % KEY,
+        "--rsh=ssh -i %s" % KEY
     ]
+    if logfile:
+        rsync_opts.append("--log-file=%s" % logfile)
 
     if delete:
         rsync_opts.append("--%s" % delete)
@@ -184,7 +186,7 @@ def backup_configs_roothome_and_database(workdir, remote_path):
             shell=True,
         )
     return "Backing up configs, root home, and database\n" + rsync_with_retry(
-        workdir, remote_path, delete="delete-after"
+        workdir, remote_path, delete="delete-after", logfile="rsync-backup-config-and-db.log"
     )
 
 
@@ -194,7 +196,7 @@ def backup_packages(remote_path, delete):
         raise Error(packages_dir + " is not a directory")
 
     return "Backing up packages\n" + rsync_with_retry(
-        packages_dir, os.path.join(remote_path, "packages"), delete=delete
+        packages_dir, os.path.join(remote_path, "packages"), delete=delete, logfile="rsync-backup-packages.log"
     )
 
 
@@ -230,9 +232,8 @@ def main():
 
         backup_date = get_current_backup_date()
 
-        tempdir = tempfile.mkdtemp(prefix="osg-koji-backup")
+        tempdir = tempfile.mkdtemp(prefix="osg-koji-backup-")
         try:
-
             workdir = os.path.join(tempdir, backup_date)
             local_backup_path = os.path.join(LOCAL_BACKUP_ROOT, backup_date)
             remote_path = os.path.join(REMOTE_BASE_PATH, "backups")
