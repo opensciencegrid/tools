@@ -13,6 +13,7 @@ KOJISUBDIR = "koji.chtc.wisc.edu"
 DBSUBDIR = "db-01.batlab.org"
 RETRIES = 10
 RETRY_WAIT = 60
+TIMEOUT = 60 * 60 * 24 * 2  # 48 hours
 NOTIFY_EMAILS = [
     x + "@cs.wisc.edu"
     for x in ["matyas+cron"]
@@ -27,6 +28,7 @@ MAIL_DELIVERY_METHOD = "sendmail"  # either 'sendmail' or 'smtp'
 import re
 import os
 import shutil
+import signal
 from subprocess import Popen, PIPE, STDOUT
 import sys
 import tempfile
@@ -56,6 +58,14 @@ class CommandError(Error):
         self.command = command
         self.returncode = returncode
         self.outerr = outerr
+
+
+class AlarmException(Exception):
+    pass
+
+
+def alarm_handler(signum, frame):
+    raise AlarmException()
 
 
 def compose_message(subject, text, recipients):
@@ -227,6 +237,8 @@ def get_current_backup_date():
 
 
 def main():
+    config_backup_time = None
+    package_backup_time = None
     try:
         details = ""
 
@@ -243,6 +255,9 @@ def main():
             olddir = os.getcwd()
             os.chdir(local_backup_path)
 
+            signal.signal(signal.SIGALRM, alarm_handler)
+            signal.alarm(TIMEOUT)
+
             start_time = time.time()
             details += backup_configs_roothome_and_database(workdir, remote_path)
             config_backup_time = time.time() - start_time
@@ -254,7 +269,23 @@ def main():
             os.chdir(olddir)
 
         finally:
+            signal.alarm(0)
             shutil.rmtree(tempdir)
+
+    except AlarmException:
+        message = "OSG Koji offsite backups timed out after %f seconds\n" % TIMEOUT
+        if config_backup_time is None:
+            message += "Config backups didn't finish\n"
+        else:
+            message += "Config backups took %f seconds\n" % config_backup_time
+        if package_backup_time is None:
+            message += "Package backups didn't finish\n"
+        else:
+            message += "Package backups took %f seconds\n" % package_backup_time
+        message += details
+
+        notify_email("OSG Koji offsite timed out", message)
+        return 124
 
     except Error as e:
         notify_email("OSG Koji offsite backups failed", str(e))
