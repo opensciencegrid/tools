@@ -11,6 +11,7 @@ REMOTE_BASE_PATH = "/data/koji"
 LOCAL_BACKUP_ROOT = "/export/backup"
 KOJISUBDIR = "koji.chtc.wisc.edu"
 DBSUBDIR = "db-01.batlab.org"
+LOGDIR = "/var/log/osg-koji-offsite-backup"
 RETRIES = 10
 RETRY_WAIT = 60
 TIMEOUT = 60 * 60 * 24 * 2  # 48 hours
@@ -25,16 +26,16 @@ REMOTE_LOGIN_HOST = "%s@%s" % (REMOTE_LOGIN, REMOTE_HOST)
 
 MAIL_DELIVERY_METHOD = "sendmail"  # either 'sendmail' or 'smtp'
 
-import re
+import errno
 import os
+import re
 import shutil
 import signal
 from subprocess import Popen, PIPE, STDOUT
+import socket
 import sys
 import tempfile
 import time
-
-import socket
 
 from email.mime.text import MIMEText
 
@@ -196,7 +197,7 @@ def backup_configs_roothome_and_database(workdir, remote_path):
             shell=True,
         )
     return "Backing up configs, root home, and database\n" + rsync_with_retry(
-        workdir, remote_path, delete="delete-after", logfile="rsync-backup-config-and-db.log"
+        workdir, remote_path, delete="delete-after", logfile=os.path.join(LOGDIR, "rsync-backup-config-and-db.log")
     )
 
 
@@ -206,7 +207,7 @@ def backup_packages(remote_path, delete):
         raise Error(packages_dir + " is not a directory")
 
     return "Backing up packages\n" + rsync_with_retry(
-        packages_dir, os.path.join(remote_path, "packages"), delete=delete, logfile="rsync-backup-packages.log"
+        packages_dir, os.path.join(remote_path, "packages"), delete=delete, logfile=os.path.join(LOGDIR,"rsync-backup-packages.log")
     )
 
 
@@ -258,6 +259,12 @@ def main():
             signal.signal(signal.SIGALRM, alarm_handler)
             signal.alarm(TIMEOUT)
 
+            try:
+                os.makedirs(LOGDIR)
+            except EnvironmentError as e:
+                if e.errno != errno.EEXIST:
+                    raise
+
             start_time = time.time()
             details += backup_configs_roothome_and_database(workdir, remote_path)
             config_backup_time = time.time() - start_time
@@ -283,16 +290,21 @@ def main():
         else:
             message += "Package backups took %f seconds\n" % package_backup_time
         message += details
+        message += "See logs in %s\n" % LOGDIR
 
         notify_email("OSG Koji offsite timed out", message)
         return 124
 
+    except KeyboardInterrupt:
+        print("Interrupted.")
+        return 3
+
     except Error as e:
-        notify_email("OSG Koji offsite backups failed", str(e))
+        notify_email("OSG Koji offsite backups failed", "%s\nSee logs in %s\n" % (e, LOGDIR))
         return str(e)
 
     except Exception as e:
-        notify_email("OSG Koji offsite backups died", str(e))
+        notify_email("OSG Koji offsite backups died",  "%s\nSee logs in %s\n" % (e, LOGDIR))
         raise
 
     else:
