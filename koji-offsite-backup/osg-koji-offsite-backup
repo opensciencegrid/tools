@@ -153,11 +153,7 @@ def csbacktick(*args, **kwargs):
 
 
 def rsync_with_retry(src_path, remote_path, delete=None, logfile=None):
-    rsync_opts = [
-        "--archive",
-        "--stats",
-        "--rsh=ssh -i %s" % KEY
-    ]
+    rsync_opts = ["--archive", "--stats", "--rsh=ssh -i %s" % KEY]
     if logfile:
         rsync_opts.append("--log-file=%s" % logfile)
 
@@ -197,7 +193,10 @@ def backup_configs_roothome_and_database(workdir, remote_path):
             shell=True,
         )
     return "Backing up configs, root home, and database\n" + rsync_with_retry(
-        workdir, remote_path, delete="delete-after", logfile=os.path.join(LOGDIR, "rsync-backup-config-and-db.log")
+        workdir,
+        os.path.join(remote_path, "configs_roothome_and_database"),
+        delete=None,
+        logfile=os.path.join(LOGDIR, "rsync-backup-config-and-db.log"),
     )
 
 
@@ -207,7 +206,10 @@ def backup_packages(remote_path, delete):
         raise Error(packages_dir + " is not a directory")
 
     return "Backing up packages\n" + rsync_with_retry(
-        packages_dir, os.path.join(remote_path, "packages"), delete=delete, logfile=os.path.join(LOGDIR,"rsync-backup-packages.log")
+        packages_dir,
+        os.path.join(remote_path, "packages"),
+        delete=delete,
+        logfile=os.path.join(LOGDIR, "rsync-backup-packages.log"),
     )
 
 
@@ -282,9 +284,11 @@ def main():
     except AlarmException:
         message = "OSG Koji offsite backups timed out after %f seconds\n" % TIMEOUT
         if config_backup_time is None:
-            message += "Config backups didn't finish\n"
+            message += "Config/roothome/db backups didn't finish\n"
         else:
-            message += "Config backups took %f seconds\n" % config_backup_time
+            message += (
+                "Config/roothome/db backups took %f seconds\n" % config_backup_time
+            )
         if package_backup_time is None:
             message += "Package backups didn't finish\n"
         else:
@@ -300,17 +304,21 @@ def main():
         return 3
 
     except Error as e:
-        notify_email("OSG Koji offsite backups failed", "%s\nSee logs in %s\n" % (e, LOGDIR))
+        notify_email(
+            "OSG Koji offsite backups failed", "%s\nSee logs in %s\n" % (e, LOGDIR)
+        )
         return str(e)
 
     except Exception as e:
-        notify_email("OSG Koji offsite backups died",  "%s\nSee logs in %s\n" % (e, LOGDIR))
+        notify_email(
+            "OSG Koji offsite backups died", "%s\nSee logs in %s\n" % (e, LOGDIR)
+        )
         raise
 
     else:
         message = "OSG Koji offsite backups to %s succeeded\n" % remote_path
-        message += "Config backups took %f seconds\n" % config_backup_time
-        message += "Package backups took %f seconds\n" % package_backup_time
+        message += "Config/roothome/db backups took %f seconds\n" % config_backup_time
+        message += "Package/roothome/db backups took %f seconds\n" % package_backup_time
         message += details
 
         notify_email("OSG Koji offsite backups completed", message)
