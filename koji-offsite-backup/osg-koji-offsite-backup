@@ -14,11 +14,9 @@ DBSUBDIR = "db-01.batlab.org"
 LOGDIR = "/var/log/osg-koji-offsite-backup"
 RETRIES = 10
 RETRY_WAIT = 60
-TIMEOUT = 60 * 60 * 24 * 2  # 48 hours
+TIMEOUT = 60 * 60 * 18  # 18 hours
 NOTIFY_EMAILS = [
-    x + "@cs.wisc.edu"
-    for x in ["matyas+cron"]
-    #    x + "@cs.wisc.edu" for x in ["blin", "cat", "edquist", "matyas+cron", "tim"]
+    x + "@cs.wisc.edu" for x in ["blin", "cat", "edquist", "matyas+cron", "tim"]
 ]
 KEY = "/root/osg_backup_key"
 
