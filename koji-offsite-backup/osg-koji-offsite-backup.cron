@@ -1,0 +1,2 @@
+# place in /etc/cron.d:
+0 6 * * sat root /root/osg-koji-offsite-backup
