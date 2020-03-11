@@ -164,10 +164,10 @@ def rsync_with_retry(src_path, remote_path, delete=None, logfile=None):
     while True:
         try:
             if count > 0:
-                text += "Retry %d" % count
+                text += "Retry %d\n" % count
             text += "-" * 60
             text += csbacktick(["rsync"] + rsync_opts + [src_path + "/", dest_path])
-            text += "." * 60
+            text += "." * 60 + "\n"
             return text
         except CommandError:
             text += "\n\n"
@@ -187,7 +187,7 @@ def backup_configs_roothome_and_database(workdir, remote_path):
 
         csbacktick(
             "tar -cp %s | gzip -n > %s"
-            % (shell_quote(directory), os.path.join(workdir, tarball)),
+            % (shell_quote(directory), shell_quote(os.path.join(workdir, tarball))),
             shell=True,
         )
     return "Backing up configs, root home, and database\n" + rsync_with_retry(
@@ -291,7 +291,7 @@ def main():
             message += "Package backups didn't finish\n"
         else:
             message += "Package backups took %f seconds\n" % package_backup_time
-        message += details
+        message += "\n" + details
         message += "See logs in %s\n" % LOGDIR
 
         notify_email("OSG Koji offsite timed out", message)
@@ -317,7 +317,7 @@ def main():
         message = "OSG Koji offsite backups to %s succeeded\n" % remote_path
         message += "Config/roothome/db backups took %f seconds\n" % config_backup_time
         message += "Package/roothome/db backups took %f seconds\n" % package_backup_time
-        message += details
+        message += "\n" + details
 
         notify_email("OSG Koji offsite backups completed", message)
         return 0
