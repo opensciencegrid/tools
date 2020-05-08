@@ -20,6 +20,7 @@ _ce_params = [
     ('gridtype_1',   'on'),
     ('active',       'on'),
     ('active_value', '1' ),
+    ('service',      'on'),
     ('service_1',    'on')
 ]
 _ces_url = "%s?%s" % (_rgsummary_url, '&'.join(map('='.join, _ce_params)))
