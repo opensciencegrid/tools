@@ -39,19 +39,24 @@ class autodict(collections.defaultdict):
 def rg_info(rg):
     facility = rg.find('Facility').find('Name').text
     site = rg.find('Site').find('Name').text
-    resources = [ (facility, site, r.find('Name').text, r.find('FQDN').text)
+    resources = [ (facility, site, r.find('Name').text, r.find('FQDN').text,
+                      resource_services(r))
                   for r in rg.find('Resources').findall('Resource') ]
     return resources
 
+def resource_services(r):
+    return set( s.find('Name').text
+                for s in r.find('Services').findall('Service') )
 
 def get_ce_resource_tree(xmltxt, exclude=None):
     #xmltxt = urlopen(_ces_url).read()
     xmltree = et.fromstring(xmltxt)
     ad = autodict()
     for rg in xmltree.findall('ResourceGroup'):
-        for facility, site, resource, fqdn in rg_info(rg):
-            if exclude is None or resource not in exclude[facility][site]:
-                ad[facility][site][resource] = fqdn
+        for facility, site, resource, fqdn, services in rg_info(rg):
+            if 'CE' in services:
+                if exclude is None or resource not in exclude[facility][site]:
+                    ad[facility][site][resource] = fqdn
     return ad
 
 
