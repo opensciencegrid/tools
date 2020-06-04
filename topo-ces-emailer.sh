@@ -14,6 +14,9 @@ REPLYTO=edquist@cs.wisc.edu
 TO=(
     lmichael@wisc.edu,
     blin@cs.wisc.edu,
+    fkw888@gmail.com,
+    cat@cs.wisc.edu,
+    jdost@ucsd.edu,
     edquist@cs.wisc.edu
 )
 
