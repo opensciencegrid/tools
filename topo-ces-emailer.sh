@@ -53,7 +53,7 @@ send_email () {
     echo
     cat "$added_report"
   } | /usr/sbin/sendmail -t
-  } </dev/null &>"$logdir/emailer.$today.$prev.log" &
+  } </dev/null &>>"$logdir/emailer.$today.$prev.log" &
 }
 
 
