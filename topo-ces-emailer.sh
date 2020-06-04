@@ -3,8 +3,10 @@ set -e
 
 today=$(date +%F)
 weekday=$(date +%a)
+monthday=$(date +%d)
 yesterday=$(date -d yesterday +%F)
 lastweek=$(date -d '1 week ago' +%F)
+lastmonth=$(date -d '1 month ago' +%F)
 
 datadir=$HOME/ce_xml_data
 logdir=$HOME/ce_xml_logs
@@ -63,5 +65,9 @@ do_email_report "$yesterday"
 
 if [[ $weekday = Mon ]]; then
   do_email_report "$lastweek" "Weekly summary - "
+fi
+
+if [[ $monthday = 01 ]]; then
+  do_email_report "$lastmonth" "Monthly summary - "
 fi
 
