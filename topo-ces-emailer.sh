@@ -30,14 +30,15 @@ PATH=$(dirname "$0"):$PATH
 do_email_report () {
   prev=$1
   subject_prefix=$2
+  always_send=$3
   added_report=$datadir/ces_added.$today.$prev.txt
   if [[ ! -e "$datadir"/ce_resources.$prev.xml ]]; then
     return
   fi
   topo-ces.py "$datadir"/ce_resources.{$prev,$today}.xml > "$added_report"
 
-  if [[ -s $added_report ]]; then
-    send_email "$subject_prefix"
+  if [[ -s $added_report || $always_send = Y ]]; then
+    send_email
   fi
 }
 
@@ -49,11 +50,17 @@ send_email () {
     echo "To: ${TO[*]}"
     echo "MIME-Version: 1.0"
     echo "Content-Type: text/plain"
-    echo "Subject: ${*}CEs added between $prev and $today"
-    echo
-    echo "CEs added between $prev and $today:"
-    echo
-    cat "$added_report"
+    if [[ -s $added_report ]]; then
+      echo "Subject: ${subject_prefix}CEs added between $prev and $today"
+      echo
+      echo "CEs added between $prev and $today:"
+      echo
+      cat "$added_report"
+    else
+      echo "Subject: ${subject_prefix}No CEs added between $prev and $today"
+      echo
+      echo "No CEs added between $prev and $today"
+    fi
   } | /usr/sbin/sendmail -t
   } </dev/null &>>"$logdir/emailer.$today.$prev.log" &
 }
@@ -64,10 +71,10 @@ topo-ces.py --getxml > "$datadir/ce_resources.$today.xml"
 do_email_report "$yesterday"
 
 if [[ $weekday = Mon ]]; then
-  do_email_report "$lastweek" "Weekly summary - "
+  do_email_report "$lastweek" "Weekly summary - " Y
 fi
 
 if [[ $monthday = 01 ]]; then
-  do_email_report "$lastmonth" "Monthly summary - "
+  do_email_report "$lastmonth" "Monthly summary - " Y
 fi
 
