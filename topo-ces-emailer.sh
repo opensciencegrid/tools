@@ -13,6 +13,7 @@ FROM=osg-ce-diff@chtc.wisc.edu
 REPLYTO=edquist@cs.wisc.edu
 TO=(
     lmichael@wisc.edu,
+    blin@cs.wisc.edu,
     edquist@cs.wisc.edu
 )
 
