@@ -45,11 +45,14 @@ def write_json_fs_obj(obj, name):
 
 
 def main(args):
-    if len(args) == 0 or len(args) > 2 or args[0].startswith('-'):
+    if (len(args) == 0 or len(args) > 2
+        or args[0].startswith("-h") or args[0].startswith("--h")
+    ):
         usage()
     path = args[0]
     dest = args[1] if len(args) == 2 else path + '%'
-    write_json_fs_obj(json.load(uopen(path)), dest)
+    fh = uopen(path) if path != '-' else sys.stdin
+    write_json_fs_obj(json.load(fh), dest)
 
 
 def usage():
@@ -57,6 +60,7 @@ def usage():
     print("Usage: {script} file.json [dest]".format(script=s))
     print()
     print("Expands contents of json file to new path 'dest'.")
+    print("If file.json is '-', read from stdin.")
     print()
     print("If 'dest' path is omitted, 'file.json%'")
     print()
