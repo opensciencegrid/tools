@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import json
 import sys
+import re
 import os
 
 
@@ -45,9 +46,7 @@ def write_json_fs_obj(obj, name):
 
 
 def main(args):
-    if (len(args) == 0 or len(args) > 2
-        or args[0].startswith("-h") or args[0].startswith("--h")
-    ):
+    if not 1 <= len(args) <= 2 or re.match(r'-.', args[0]):
         usage()
     path = args[0]
     dest = args[1] if len(args) == 2 else path + '%'
