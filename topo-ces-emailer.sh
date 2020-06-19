@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+# crontab:  0 6 * * *   tools/topo-ces-emailer.sh
+
 today=$(date +%F)
 weekday=$(date +%a)
 monthday=$(date +%d)
