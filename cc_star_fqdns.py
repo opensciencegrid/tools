@@ -20,8 +20,6 @@ _rgsummary_url = 'https://{host}/rgsummary/xml'
 _ce_params = [
     ('gridtype',     'on'),
     ('gridtype_1',   'on'),
-    ('active',       'on'),
-    ('active_value', '1' ),
     ('service',      'on'),
     ('service_1',    'on')
 ]
