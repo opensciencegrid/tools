@@ -13,7 +13,9 @@ RECIPIENTS = (
 )
 PROJECT = 'SOFTWARE'
 STATUSES = ('Open',
+            'Selected for Development',
             'In Progress',
+            'Development Complete',
             'Ready for Testing',
             'Ready for Release')
 URL = 'https://opensciencegrid.atlassian.net'
