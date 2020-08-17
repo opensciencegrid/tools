@@ -12,7 +12,10 @@ RECIPIENTS = (
     'Mat Selmeci <matyas+cron@cs.wisc.edu>',
 )
 PROJECT = 'SOFTWARE'
-STATUSES = ('Open', 'In Progress', 'Ready for Testing', 'Ready for Release')
+STATUSES = ('Open',
+            'In Progress',
+            'Ready for Testing',
+            'Ready for Release')
 URL = 'https://opensciencegrid.atlassian.net'
 
 jira = JIRA(URL)
