@@ -23,9 +23,9 @@ information will be printed for the listed packages across all output-NNN
 subdirectories for that set of osg test runs.
 
 If a VMU-RESULTS-URL is provided, the corresponding run dir will be used.
-Eg: "http://vdt.cs.wisc.edu/tests/20180604-1516/005/osg-test-20180604.log"
+Eg: "https://osg-sw-submit.chtc.wisc.edu/tests/20180604-1516/005/osg-test-20180604.log"
 for an individual output job (005),
-or: "http://vdt.cs.wisc.edu/tests/20180604-1516/packages.html"
+or: "https://osg-sw-submit.chtc.wisc.edu/tests/20180604-1516/packages.html"
 for a summary of all jobs for the run.
 
 Options:
@@ -100,7 +100,7 @@ def parseargs():
         if m:
             outdir = "%s/run-%s" % (GLOBAL_RUNS_DIR, m.group(1))
             if m.group(2) is not None:
-                outdir += "/output-%s" % m.group(2)
+                outdir += "/jobs/output-%s" % m.group(2)
             else:
                 summarize = True
 
@@ -273,7 +273,7 @@ def get_run_output_dirs(rundir):
     elif re.match(r'20[0-9]{6}-[0-9]{4}$', rundir):
         rundir = "%s/run-%s" % (GLOBAL_RUNS_DIR, rundir)
 
-    globpat = "%s/output-[0-9][0-9][0-9]*/" % rundir
+    globpat = "%s/jobs/output-[0-9][0-9][0-9]*/" % rundir
     outputs = sorted(glob.glob(globpat))
 
     if not outputs:
