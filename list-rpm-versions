@@ -119,9 +119,22 @@ def group_adjacent(a,k):
     ''' group_adjacent([1,2,3,4,5,6], 3) -> [(1,2,3), (4,5,6)] '''
     return zip(*([iter(a)] * k))
 
+def parse_nevra(item):
+    nevr,a = item.rsplit('.',1)
+    n,ev,r = nevr.rsplit('-',2)
+    na = "%s.%s" % (n,a)
+    evr = "%s-%s" % (ev,r)
+    return na,evr
+
+def get_nv_evr_list(items):
+    if '.el8' in items[-1]:
+        return map(parse_nevra, items)
+    else:
+        return group_adjacent(items, 2)
+
 def nvrgen(items):
     # generate sequence of ["name.arch", "epoch:version-release"] pairs
-    for na,evr in group_adjacent(items, 2):
+    for na,evr in get_nv_evr_list(items):
         if strip_arch:
             na = arch_strip(na)
         if strip_dist:
@@ -148,7 +161,7 @@ def rpm_qa2na_vr(line):
 
 def scrape_installed_packages(txt):
     installed_pkgs = {}
-    items_pat = (r'^(?:Dependency )?(Installed|Updated|Replaced):\n'
+    items_pat = (r'^(?:Dependency )?(Installed|Updated|Upgraded|Replaced):\n'
                  r'(.*?)\n(?:\n|(?=[^ ]))')
     for section, pkgtxt in re.findall(items_pat, txt, re.S | re.M):
         pkg_items = pkgtxt.split()
