@@ -72,7 +72,7 @@ def run_git_command(command, directory=None, git_directory=None):
         full_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
     out = git_proc.communicate()[0].strip()
-    outstr = "output: %s" % out if out else "no output"
+    outstr = "output:\n%s\n\n" % out if out else "no output\n"
 
     command_str = " ".join(pipes.quote(x) for x in full_command)
     if git_proc.returncode != 0:
@@ -94,7 +94,7 @@ def git_clone_or_pull(repo, directory, branch):
     """
     if not os.path.exists(directory):
         log.info(
-            "Making initial repo clone from %s to %s; using branch %s",
+            "Making initial repo clone from %s to %s; using branch %s\n",
             repo,
             directory,
             branch,
@@ -105,7 +105,7 @@ def git_clone_or_pull(repo, directory, branch):
 
     if os.path.exists(os.path.join(directory, ".git")):
         log.info(
-            "Cleaning and updating %s to the latest branch %s from origin",
+            "Cleaning and updating %s to the latest branch %s from origin\n",
             directory,
             branch,
         )
