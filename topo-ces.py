@@ -37,10 +37,15 @@ class autodict(collections.defaultdict):
         return dict.__repr__(self)
 
 
+def r_is_cc_star(r):
+    return any( tag.text == 'CC*' for tag in r.find('Tags').findall('Tag') )
+
+
 def rg_info(rg):
     facility = rg.find('Facility').find('Name').text
     site = rg.find('Site').find('Name').text
-    resources = [ (facility, site, r.find('Name').text, r.find('FQDN').text)
+    resources = [ (facility, site, r.find('Name').text, r.find('FQDN').text,
+                                   r_is_cc_star(r))
                   for r in rg.find('Resources').findall('Resource') ]
     return resources
 
@@ -50,9 +55,9 @@ def get_ce_resource_tree(xmltxt, exclude=None):
     xmltree = et.fromstring(xmltxt)
     ad = autodict()
     for rg in xmltree.findall('ResourceGroup'):
-        for facility, site, resource, fqdn in rg_info(rg):
+        for facility, site, resource, fqdn, ccstar in rg_info(rg):
             if exclude is None or resource not in exclude[facility][site]:
-                ad[facility][site][resource] = fqdn
+                ad[facility][site][resource] = fqdn, ccstar
     return ad
 
 
@@ -61,8 +66,10 @@ def print_resource_tree(ad):
         print("Facility: %s" % facility_name)
         for site_name, site_ad in sorted(facility_ad.items()):
             print("  Site: %s" % site_name)
-            for resource_name, fqdn in sorted(site_ad.items()):
-                print("    Resource: %s (%s)" % (fqdn, resource_name))
+            for resource_name, (fqdn, ccstar) in sorted(site_ad.items()):
+                ccstr = "CC*" if ccstar else "No CC* tag"
+                print("    Resource: %s (%s) (%s)" %
+                           (fqdn, resource_name, ccstr))
             print()
 
 
