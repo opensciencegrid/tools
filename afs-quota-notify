@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# (ignore bad script name) pylint: disable=C0103
+#!/usr/bin/env python2
+# ^^^ TODO convert me (move off of ingwe first)
 from __future__ import print_function
 
 import os
@@ -100,13 +100,13 @@ def get_disk_usage_percent(directory):
         ['/usr/bin/fs', 'listquota', directory], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     listquota_output = listquota_proc.communicate()[0].split("\n")
     if listquota_proc.returncode != 0:
-        print('{0}: fs listquota returned {1:d}. Output: {2}'.format(directory, listquota_proc.returncode, listquota_output))
+        raise RuntimeError('{0}: fs listquota returned {1:d}. Output: {2}'.format(directory, listquota_proc.returncode, listquota_output))
 
     # The second line contains the information
     try:
         return _disk_quota_percent_used(listquota_output[1])
-    except (TypeError, IndexError):
-        print('{0}: fs listquota did not return expected output: {1}'.format(directory, listquota_output))
+    except (TypeError, IndexError, ValueError):
+        raise RuntimeError('{0}: fs listquota did not return expected output: {1}'.format(directory, listquota_output))
 
 
 def read_config(config_fp):
@@ -168,8 +168,14 @@ def main(argv):
     warning_count = 0
     highest = 0.0
     highest_path = ""
+    errors = ""
     for dirpath in directories:
-        disk_usage = get_disk_usage_percent(dirpath)
+        try:
+            disk_usage = get_disk_usage_percent(dirpath)
+        except RuntimeError as err:
+            errors += "%s\n" % err
+            continue
+
         warning_str = ""
 
         if disk_usage > highest:
@@ -205,6 +211,9 @@ def main(argv):
     else:
         msg_subject += "all dirs are below {0:.1f}%".format(threshold)
 
+    if errors:
+        msg_subject += "; ERRORS ENCOUNTERED"
+        msg_text += "\n\nThe following errors were encountered:\n\n" + str(errors)
 
     send_email(email, msg_subject, msg_text, dry_run)
 
