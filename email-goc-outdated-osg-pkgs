@@ -31,6 +31,6 @@ Subject: $subject
   } </dev/null &>/dev/null &
 }
 
-#check_for_el 6 3.4
-check_for_el 7 3.4
+#check_for_el 6 3.5
+check_for_el 7 3.5
 

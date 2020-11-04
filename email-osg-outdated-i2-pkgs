@@ -10,7 +10,7 @@ TO=technology-team@opensciencegrid.org
 
 check_for_el () {
   EL=$1
-  OSG=3.4
+  OSG=3.5
 
   DATE=$(date +%F)
   subject="OSG $OSG packages behind Internet2 versions (el$EL)"
