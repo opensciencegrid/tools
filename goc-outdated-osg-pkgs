@@ -2,10 +2,10 @@
 
 """
 Usage:
-  %s [el6|el7] [3.3|3.4] [development|testing|release] [itb|production]
+  %s [3.3|3.4|3.5] [el6|el7] [development|testing|release] [itb|production]
 
 Default is:
-  el%s %s %s %s
+  %s el%s %s %s
 
 Options:
   --make-cache     save goc-elX-YY.html and osg-3.X-elX-ZZ.list for offline use
@@ -41,7 +41,7 @@ preamble   = None
 
 def usage():
     script = os.path.basename(__file__)
-    print __doc__ % (script, EL, SERIES, OSG_REPO, GOC_REPO)
+    print __doc__ % (script, SERIES, EL, OSG_REPO, GOC_REPO)
     sys.exit()
 
 for arg in sys.argv[1:]:
