@@ -2,7 +2,7 @@
 
 """
 Usage:
-  %s [3.3|3.4] [el6|el7] [development|testing|release]
+  %s [3.3|3.4|3.5] [el6|el7] [development|testing|release]
 
 Default is:
   %s el%s %s
@@ -189,4 +189,3 @@ else:
 
 if html_out:
     print "</pre>\n</body>\n</html>"
-
