@@ -81,25 +81,6 @@ for arg in sys.argv[2:]:
             SERIES = arg
         elif re.search(r'^(upcoming-)?(development|testing|release)$', arg):
             OSG_REPO = arg
-        elif arg in ('itb', 'production'):
-            GOC_REPO = arg
-        elif arg == '--cached':
-            use_cached = True
-        elif arg == '--make-cache':
-            make_cache = True
-        elif arg == '--color':
-            use_color = True
-        elif arg == '--no-color':
-            use_color = False
-        elif arg == '--html':
-            html_out = True
-            use_color = True
-        elif arg.startswith('--preamble='):
-            preamble = arg[len('--preamble='):]
-        elif arg == '--show-all':
-            show_all = True
-        else:
-            usage()
     elif MODE == 'osg-epel':
         if re.search(r'^el[5-9]$', arg):
             EL = arg[2]
@@ -108,23 +89,6 @@ for arg in sys.argv[2:]:
         elif re.search(r'^(upcoming-)?(development|testing|release)$', arg) \
             or arg in ('itb', 'production'):
             TAG = arg
-        elif arg == '--cached':
-            use_cached = True
-        elif arg == '--make-cache':
-            make_cache = True
-        elif arg == '--color':
-            use_color = True
-        elif arg == '--no-color':
-            use_color = False
-        elif arg == '--html':
-            html_out = True
-            use_color = True
-        elif arg.startswith('--preamble='):
-            preamble = arg[len('--preamble='):]
-        elif arg == '--show-all':
-            show_all = True
-        else:
-            usage()
     elif MODE == 'osg-i2':
         if re.search(r'^el[5-9]$', arg):
             EL = arg[2]
@@ -132,23 +96,24 @@ for arg in sys.argv[2:]:
             SERIES = arg
         elif re.search(r'^(upcoming-)?(development|testing|release)$', arg):
             TAG = arg
-        elif arg == '--cached':
-            use_cached = True
-        elif arg == '--make-cache':
-            make_cache = True
-        elif arg == '--color':
-            use_color = True
-        elif arg == '--no-color':
-            use_color = False
-        elif arg == '--html':
-            html_out = True
-            use_color = True
-        elif arg.startswith('--preamble='):
-            preamble = arg[len('--preamble='):]
-        elif arg == '--show-all':
-            show_all = True
-        else:
-            usage()
+    elif arg == '--cached':
+        use_cached = True
+    elif arg == '--make-cache':
+        make_cache = True
+    elif arg == '--color':
+        use_color = True
+    elif arg == '--no-color':
+        use_color = False
+    elif arg == '--html':
+        html_out = True
+        use_color = True
+    elif arg.startswith('--preamble='):
+        preamble = arg[len('--preamble='):]
+    elif arg == '--show-all':
+        show_all = True
+    else:
+        usage()
+    
 
 if use_cached and make_cache:
     usage()
@@ -278,6 +243,8 @@ def colorize_html_vr(vr1, vr2):
 
     return map('-'.join, [[v1,r1],[v2,r2]])
 
+
+
 if html_out:
     colorize_vr = colorize_html_vr
     print ("<html>\n<head>\n<style type='text/css'>\n.vdiff {color:green}\n"
@@ -289,6 +256,31 @@ if preamble:
 
 pkg_diffs = []
 
+def get_pkg_diff(source, compare):
+     for pkg in sorted(source):
+        if pkg in compare:
+            vrcmp = rpmvercmp(source[pkg], compare[pkg])
+            if vrcmp < 0 or show_all:
+                pkg_diffs.append([pkg, source[pkg], compare[pkg]])
+
+def handle_pkg_diff():
+    if pkg_diffs:
+        if MODE == 'goc':
+            pkg_diffs[:0] = [["Package", "EL%s GOC" % EL, "OSG " + SERIES]]
+        elif MODE == 'osg-epel':
+            pkg_diffs[:0] = [["Package", "OSG " + SERIES, "EPEL " + EL]]
+        elif MODE == 'osg-i2':
+            pkg_diffs[:0] = [["Package", "OSG " + SERIES, "I2 EL" + EL]]
+        widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
+        pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
+        for i,row in enumerate(pkg_diffs):
+            spacing = [ w-len(x) for x,w in zip(row,widths) ]
+            if use_color and i > 1:
+                row[1:] = colorize_vr(*row[1:])
+            print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
+    else:
+        print "No package version differences"
+
 if MODE == 'goc':
     goc_tag = "goc-el%s-%s" % (EL, GOC_REPO)
     osg_tag = "osg-%s-el%s-%s" % (SERIES, EL, OSG_REPO)
@@ -296,64 +288,18 @@ if MODE == 'goc':
     goc_map = nvrmap(get_koji_list(goc_tag))
     osg_map = nvrmap(get_koji_list(osg_tag))
 
-    for pkg in sorted(goc_map):
-        if pkg in osg_map:
-            vrcmp = rpmvercmp(goc_map[pkg], osg_map[pkg])
-            if vrcmp < 0 or show_all:
-                pkg_diffs.append([pkg, goc_map[pkg], osg_map[pkg]])
-
-    if pkg_diffs:
-        pkg_diffs[:0] = [["Package", "EL%s GOC" % EL, "OSG " + SERIES]]
-        widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
-        pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
-        for i,row in enumerate(pkg_diffs):
-            spacing = [ w-len(x) for x,w in zip(row,widths) ]
-            if use_color and i > 1:
-                row[1:] = colorize_vr(*row[1:])
-            print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
-    else:
-        print "No package version differences"
+    get_pkg_diff(goc_map, osg_map)
+    handle_pkg_diff()
 elif MODE == 'osg-epel':
     epel_map = nvrmap(get_epel_list())
     osg_map  = nvrmap(get_osg_list())
-    for pkg in sorted(osg_map):
-        if pkg in epel_map:
-            vrcmp = rpmvercmp(osg_map[pkg], epel_map[pkg])
-            if vrcmp < 0 or show_all:
-                pkg_diffs.append([pkg, osg_map[pkg], epel_map[pkg]])
-
-    if pkg_diffs:
-        pkg_diffs[:0] = [["Package", "OSG " + SERIES, "EPEL " + EL]]
-        widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
-        pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
-        for i,row in enumerate(pkg_diffs):
-            spacing = [ w-len(x) for x,w in zip(row,widths) ]
-            if use_color and i > 1:
-                row[1:] = colorize_vr(*row[1:])
-            print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
-    else:
-        print "No package version differences"
+    get_pkg_diff(epel_map, osg_map)
+    handle_pkg_diff()
 elif MODE == 'osg-i2':
     i2_map = nvrmap(get_i2_list())
     osg_map  = nvrmap(get_osg_list())
-
-    for pkg in sorted(osg_map):
-        if pkg in i2_map:
-            vrcmp = rpmvercmp(osg_map[pkg], i2_map[pkg])
-            if vrcmp < 0 or show_all:
-                pkg_diffs.append([pkg, osg_map[pkg], i2_map[pkg]])
-
-    if pkg_diffs:
-        pkg_diffs[:0] = [["Package", "OSG " + SERIES, "I2 EL" + EL]]
-        widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
-        pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
-        for i,row in enumerate(pkg_diffs):
-            spacing = [ w-len(x) for x,w in zip(row,widths) ]
-            if use_color and i > 1:
-                row[1:] = colorize_vr(*row[1:])
-            print '  '.join( r + ' ' * s for r,s in zip(row,spacing) ).rstrip()
-    else:
-        print "No package version differences"
+    get_pkg_diff(i2_map, osg_map)
+    handle_pkg_diff()
 
 if html_out:
     print "</pre>\n</body>\n</html>"
