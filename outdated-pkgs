@@ -3,7 +3,7 @@
 """
 Usage:
   For goc packages:
-      %s goc      [3.3|3.4]     [el6|el7] [development|testing|release] [itb|production]
+      %s goc-osg  [3.3|3.4]     [el6|el7] [development|testing|release] [itb|production]
   For osg epel packages:
       %s osg-epel [3.4|3.5|3.5] [el6|el7] [development|testing|release]
     Or:
@@ -61,7 +61,7 @@ def usage(func):
     sys.exit()
 
 # Mode selection
-if sys.argv[1] in ['goc', 'osg-epel', 'osg-i2']:
+if sys.argv[1] in ['goc-osg', 'osg-epel', 'osg-i2']:
     MODE = sys.argv[1]
 else:
     usage()
@@ -70,11 +70,11 @@ else:
 if MODE == 'osg-i2':
     # Since default EL is 6 for i2 pkgs
     EL = '6'
-if MODE == 'goc':
+if MODE == 'goc-osg':
     SERIES = '3.4'
 
 for arg in sys.argv[2:]:
-    if MODE == 'goc':
+    if MODE == 'goc-osg':
         if re.search(r'^el[5-9]$', arg):
             EL = arg[2]
         elif re.search(r'^[3-9]\.[0-9]$', arg):
@@ -206,7 +206,7 @@ def nvrmap(seq):
     return dict( n_vr(nvr) for nvr in seq )
 
 if make_cache:
-    if MODE != 'goc':
+    if MODE != 'goc-osg':
         # osg scripts both call this function
         get_osg_list()
     if MODE == 'osg-epel':
@@ -265,7 +265,7 @@ def get_pkg_diff(source, compare):
 
 def handle_pkg_diff():
     if pkg_diffs:
-        if MODE == 'goc':
+        if MODE == 'goc-osg':
             pkg_diffs[:0] = [["Package", "EL%s GOC" % EL, "OSG " + SERIES]]
         elif MODE == 'osg-epel':
             pkg_diffs[:0] = [["Package", "OSG " + SERIES, "EPEL " + EL]]
@@ -281,7 +281,7 @@ def handle_pkg_diff():
     else:
         print "No package version differences"
 
-if MODE == 'goc':
+if MODE == 'goc-osg':
     goc_tag = "goc-el%s-%s" % (EL, GOC_REPO)
     osg_tag = "osg-%s-el%s-%s" % (SERIES, EL, OSG_REPO)
 
