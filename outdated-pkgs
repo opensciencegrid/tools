@@ -293,12 +293,12 @@ if MODE == 'goc':
 elif MODE == 'osg-epel':
     epel_map = nvrmap(get_epel_list())
     osg_map  = nvrmap(get_osg_list())
-    get_pkg_diff(epel_map, osg_map)
+    get_pkg_diff(osg_map, epel_map)
     handle_pkg_diff()
 elif MODE == 'osg-i2':
     i2_map = nvrmap(get_i2_list())
     osg_map  = nvrmap(get_osg_list())
-    get_pkg_diff(i2_map, osg_map)
+    get_pkg_diff(osg_map, i2_map)
     handle_pkg_diff()
 
 if html_out:
