@@ -74,28 +74,14 @@ if MODE == 'goc-osg':
     SERIES = '3.4'
 
 for arg in sys.argv[2:]:
-    if MODE == 'goc-osg':
-        if re.search(r'^el[5-9]$', arg):
-            EL = arg[2]
-        elif re.search(r'^[3-9]\.[0-9]$', arg):
-            SERIES = arg
-        elif re.search(r'^(upcoming-)?(development|testing|release)$', arg):
-            OSG_REPO = arg
-    elif MODE == 'osg-epel':
-        if re.search(r'^el[5-9]$', arg):
-            EL = arg[2]
-        elif re.search(r'^[3-9]\.[0-9]$', arg) or arg == 'devops':
-            SERIES = arg
-        elif re.search(r'^(upcoming-)?(development|testing|release)$', arg) \
+    if re.search(r'^el[5-9]$', arg):
+        EL = arg[2]
+    elif re.search(r'^[3-9]\.[0-9]$', arg) or arg == 'devops':
+        SERIES = arg
+    elif re.search(r'^(upcoming-)?(development|testing|release)$', arg) \
             or arg in ('itb', 'production'):
-            TAG = arg
-    elif MODE == 'osg-i2':
-        if re.search(r'^el[5-9]$', arg):
-            EL = arg[2]
-        elif re.search(r'^[3-9]\.[0-9]$', arg):
-            SERIES = arg
-        elif re.search(r'^(upcoming-)?(development|testing|release)$', arg):
-            TAG = arg
+        TAG = arg
+        OSG_REPO = arg
     elif arg == '--cached':
         use_cached = True
     elif arg == '--make-cache':
@@ -254,23 +240,18 @@ if preamble:
     print preamble
     print
 
-pkg_diffs = []
-
 def get_pkg_diff(source, compare):
-     for pkg in sorted(source):
+    pkg_diffs = []
+    for pkg in sorted(source):
         if pkg in compare:
             vrcmp = rpmvercmp(source[pkg], compare[pkg])
             if vrcmp < 0 or show_all:
                 pkg_diffs.append([pkg, source[pkg], compare[pkg]])
+    return pkg_diffs
 
-def handle_pkg_diff():
+def handle_pkg_diff(pkg_diffs, source, current):
     if pkg_diffs:
-        if MODE == 'goc-osg':
-            pkg_diffs[:0] = [["Package", "EL%s GOC" % EL, "OSG " + SERIES]]
-        elif MODE == 'osg-epel':
-            pkg_diffs[:0] = [["Package", "OSG " + SERIES, "EPEL " + EL]]
-        elif MODE == 'osg-i2':
-            pkg_diffs[:0] = [["Package", "OSG " + SERIES, "I2 EL" + EL]]
+        pkg_diffs[:0] = [["Package", source, current]]
         widths = [ max(map(len,col)) for col in zip(*pkg_diffs) ]
         pkg_diffs[1:1] = [[ '-' * n for n in widths ]]
         for i,row in enumerate(pkg_diffs):
@@ -288,18 +269,22 @@ if MODE == 'goc-osg':
     goc_map = nvrmap(get_koji_list(goc_tag))
     osg_map = nvrmap(get_koji_list(osg_tag))
 
-    get_pkg_diff(goc_map, osg_map)
-    handle_pkg_diff()
+    pkg_diffs = get_pkg_diff(goc_map, osg_map)
+    handle_pkg_diff(pkg_diffs, "EL%s GOC" % EL, "OSG " + SERIES)
+
 elif MODE == 'osg-epel':
     epel_map = nvrmap(get_epel_list())
     osg_map  = nvrmap(get_osg_list())
-    get_pkg_diff(osg_map, epel_map)
-    handle_pkg_diff()
+
+    pkg_diffs = get_pkg_diff(osg_map, epel_map)
+    handle_pkg_diff(pkg_diffs, "OSG " + SERIES, "EPEL " + EL)
+
 elif MODE == 'osg-i2':
     i2_map = nvrmap(get_i2_list())
     osg_map  = nvrmap(get_osg_list())
-    get_pkg_diff(osg_map, i2_map)
-    handle_pkg_diff()
+
+    pkg_diffs = get_pkg_diff(osg_map, i2_map)
+    handle_pkg_diff(pkg_diffs, "OSG " + SERIES, "I2 EL" + EL)
 
 if html_out:
     print "</pre>\n</body>\n</html>"
