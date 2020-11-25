@@ -5,8 +5,11 @@ ghmdir=$topdir/github_meta
 logdir=$topdir/log
 srcdir=$topdir/script
 
-# PyGithub and pyjwt libs installed locally on moria under ~/.local/lib
-#export PYTHONPATH=$HOME/.local_python/lib/python2.6/site-packages/
+
+# Note:
+#   - pyjwt and PyGithub libs installed locally on moria under ~/.local/lib
+#   - See ~/git/ for the versions installed, with: ./setup.py build;
+#                                                  ./setup.py install --user
 
 cd $ghmdir
 
