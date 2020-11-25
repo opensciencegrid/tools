@@ -5,8 +5,8 @@ ghmdir=$topdir/github_meta
 logdir=$topdir/log
 srcdir=$topdir/script
 
-# PyGithub and pyjwt libs installed locally on ingwe
-export PYTHONPATH=$HOME/.local_python/lib/python2.6/site-packages/
+# PyGithub and pyjwt libs installed locally on moria under ~/.local/lib
+#export PYTHONPATH=$HOME/.local_python/lib/python2.6/site-packages/
 
 cd $ghmdir
 
