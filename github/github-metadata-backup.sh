@@ -1,14 +1,22 @@
 #!/bin/bash
+set -e
 
 topdir=/p/condor/workspaces/vdt/git
 ghmdir=$topdir/github_meta
 logdir=$topdir/log
 srcdir=$topdir/script
+local_ghmdir=$HOME/github_meta
 
-# PyGithub and pyjwt libs installed locally on moria under ~/.local/lib
-#export PYTHONPATH=$HOME/.local_python/lib/python2.6/site-packages/
+# due to the enormous number of files involved:
+#   - origin bare repo on AFS is $ghmdir/repos.git
+#   - working copy is on local disk under $local_ghmdir
 
-cd $ghmdir
+# Note:
+#   - pyjwt and PyGithub libs installed locally on moria under ~/.local/lib
+#   - See ~/git/ for the versions installed, with: ./setup.py build;
+#                                                  ./setup.py install --user
+
+cd "$local_ghmdir"
 
 /usr/bin/stdbuf -oL \
 $srcdir/ghb.py opensciencegrid $ghmdir/token >$logdir/ghmeta_backup.log \
@@ -19,5 +27,6 @@ cd repos/
 git add .
 if [[ $(git status --porcelain) ]]; then
   git commit -qm auto-bak
+  git push
 fi
 
