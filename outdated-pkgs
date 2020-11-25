@@ -2,16 +2,16 @@
 
 """
 Usage:
-  For goc packages:
+  For goc packages behind osg versions:
       %s goc-osg  [3.3|3.4]     [el6|el7] [development|testing|release] [itb|production]
-  For osg epel packages:
+  For osg packages behind epel versions:
       %s osg-epel [3.4|3.5|3.5] [el6|el7] [development|testing|release]
     Or:
       %s osg-epel [devops]      [el7|el8] [itb|production]
-  For osg i2 packages:
+  For osg packages behind i2 versions:
       %s osg-i2   [3.3|3.4]     [el6|el7] [development|testing|release]
 
-Default for goc:
+Default for goc-osg:
   %s el%s %s %s
 Default for osg-epel:
   %s el%s %s
