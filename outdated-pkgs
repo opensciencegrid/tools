@@ -7,8 +7,6 @@ Usage:
     Or:
       %s osg-epel [devops]      [el7|el8] [itb|production]
 
-Default for goc-osg:
-  %s el%s %s %s
 Default for osg-epel:
   %s el%s %s
 Default for osg-i2:
