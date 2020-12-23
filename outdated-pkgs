@@ -34,7 +34,6 @@ SERIES   = '3.5'
 EL       = '7'
 TAG      = 'release'
 OSG_REPO = 'release'
-GOC_REPO = 'production'
 
 use_cached = False
 make_cache = False
@@ -47,9 +46,7 @@ preamble   = None
 def usage(func):
     # check which funcion user used, print different values
     script = os.path.basename(__file__)
-    print __doc__ % (script, script, script, script,
-                    SERIES, EL, OSG_REPO, GOC_REPO,
-                    SERIES, EL, TAG,
+    print __doc__ % (script, script,
                     SERIES, EL, TAG)
     sys.exit()
 
