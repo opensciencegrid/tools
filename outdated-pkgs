@@ -3,7 +3,7 @@
 """
 Usage:
   For osg packages behind epel versions:
-      %s osg-epel [3.4|3.5|3.5] [el6|el7] [development|testing|release]
+      %s osg-epel [3.5] [el7|el8] [development|testing|release]
     Or:
       %s osg-epel [devops]      [el7|el8] [itb|production]
   For osg packages behind i2 versions:
