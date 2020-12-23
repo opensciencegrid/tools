@@ -2,8 +2,6 @@
 
 """
 Usage:
-  For goc packages behind osg versions:
-      %s goc-osg  [3.3|3.4]     [el6|el7] [development|testing|release] [itb|production]
   For osg packages behind epel versions:
       %s osg-epel [3.4|3.5|3.5] [el6|el7] [development|testing|release]
     Or:
