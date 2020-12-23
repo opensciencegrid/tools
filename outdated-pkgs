@@ -6,8 +6,6 @@ Usage:
       %s osg-epel [3.5] [el7|el8] [development|testing|release]
     Or:
       %s osg-epel [devops]      [el7|el8] [itb|production]
-  For osg packages behind i2 versions:
-      %s osg-i2   [3.3|3.4]     [el6|el7] [development|testing|release]
 
 Default for goc-osg:
   %s el%s %s %s
