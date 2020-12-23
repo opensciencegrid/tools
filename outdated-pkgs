@@ -9,8 +9,6 @@ Usage:
 
 Default for osg-epel:
   %s el%s %s
-Default for osg-i2:
-  %s el%s %s
 
 Options:
   --make-cache     save (goc-elX-YY.html, osg-3.X-elX-ZZ.list) | ( (epelX.html | i2_X.html) and osg-3.X-elX-XXX.list) for offline use
