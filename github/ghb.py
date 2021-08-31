@@ -86,8 +86,13 @@ def dump_items(items, updated_at_path=None, nest=None, want_since=False):
         print "no new items for %s" % updated_at_path.replace('.ts', '')
     return updated_items
 
+def accepts_since(f):
+    c = f.func_code
+    argnames = c.co_varnames[:c.co_argcount]
+    return 'since' in argnames
+
 def get_since_kw(path, itemgetter):
-    want_since = ':param since:' in itemgetter.__doc__  # yikes...
+    want_since = accepts_since(itemgetter)
     if want_since and os.path.exists(path):
         last = raw_to_datetime(open(path).read().rstrip())
         since = last + datetime.timedelta(0, 1)
