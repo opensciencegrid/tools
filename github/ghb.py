@@ -78,7 +78,8 @@ def dump_items(items, updated_at_path=None, nest=None, want_since=False):
     if nest:
         for item in updated_items:
             dump_updated_obj_items(item, nest)
-    if updated_items and want_since:
+    if want_since and (updated_items or
+                       (items and not os.path.exists(updated_at_path))):
         if hasattr(items[0], 'updated_at'):
             last_update = max( i.updated_at for i in items )
             print "writing %s" % updated_at_path
