@@ -67,10 +67,11 @@ def dump_repo(repo):
 def dump_updated_obj_items(obj, gettername, nest=None, **igkw):
     updated_at_path = "%s/%s.ts" % (rel_url_path(obj.url), gettername)
     itemgetter = getattr(obj, "get_" + gettername)
-    kw = get_since_kw(updated_at_path, itemgetter)
+    want_since = accepts_since(itemgetter)
+    kw = get_since_kw(updated_at_path, itemgetter, want_since)
     kw.update(igkw)
     items = list(itemgetter(**kw))
-    return dump_items(items, updated_at_path, nest, 'since' in kw)
+    return dump_items(items, updated_at_path, nest, want_since)
 
 def dump_items(items, updated_at_path=None, nest=None, want_since=False):
     updated_items = filter(dump_obj, items)
@@ -91,8 +92,7 @@ def accepts_since(f):
     argnames = c.co_varnames[:c.co_argcount]
     return 'since' in argnames
 
-def get_since_kw(path, itemgetter):
-    want_since = accepts_since(itemgetter)
+def get_since_kw(path, itemgetter, want_since):
     if want_since and os.path.exists(path):
         last = raw_to_datetime(open(path).read().rstrip())
         since = last + datetime.timedelta(0, 1)
