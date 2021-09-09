@@ -16,7 +16,7 @@ def usage(msg=None):
 
     s = os.path.basename(__file__)
     print """\
-usage: [PASS=...] %s [-u USER[:PASS]] [-d passfd] [-H] COMMAND [args...]
+usage: [PASS=...] %s [-p PASS] [-d passfd] [-H] COMMAND [args...]
 
 COMMANDs:
 
@@ -44,13 +44,12 @@ COMMANDs:
   (*)   list-hooks       OWNER REPO
   (*)   ping-hook        OWNER REPO HOOK_ID
         
-(*) USER login required
+(*) auth required
 
-PASS for USER is taken from the first of:
-  1. -u USER:PASS
+PASS (a github PAT) for auth is taken from the first of:
+  1. -p PASS
   2. -d passfd (read from fd)
   3. read from $PASS env var
-  4. read from terminal
 
 Options:
   -H   show http response headers
@@ -86,16 +85,13 @@ def authsetup(user, passwd):
     from base64 import encodestring
     options.authstr = encodestring('%s:%s' % (user,passwd)).replace('\n', '')
 
-def getpw(user, passfd=None):
-    if ':' in user:
-        user, pw = user.split(':', 1)
+def getpw(pat, passfd=None):
+    if pat:
+        return pat
     elif passfd is not None:
-        pw = os.fdopen(passfd).readline().rstrip('\n')
+        return os.fdopen(passfd).readline().rstrip('\n')
     elif 'PASS' in os.environ:
-        pw = os.environ['PASS']
-    else:
-        pw = getpass.getpass('passwd for user %s: ' % user)
-    return user, pw
+        return os.environ['PASS']
 
 def linkparse(linktext):
     mm = re.findall(r'<([^>]+)>;\s*rel="([^"]+)"', linktext)
@@ -302,7 +298,7 @@ def ping_hook(owner, repo, hook_id):
     snarfer(POST, "/repos/%s/%s/hooks/%s/pings" % (owner, repo, hook_id))
 
 methods = {
-#   'command-name':     [method,   user_required],
+#   'command-name':     [method,   auth_required],
     'list-mine':        [list_mine,        True],
     'list-user':        [list_user,        False],
     'list-org':         [list_org,         False],
@@ -342,15 +338,15 @@ def method_argcount_ok(method, args):
     return cmd_args - def_args <= len(args) <= cmd_args
 
 def main(args):
-    ops, args = getopt.getopt(args, 'u:d:HF:')
+    ops, args = getopt.getopt(args, 'p:d:HF:')
     ops = dict(ops)
     if len(args) < 1:
         usage()
 
-    user   = None
+    pat    = None
     passfd = None
 
-    if '-u' in ops: user   =     ops['-u']
+    if '-p' in ops: pat    =     ops['-p']
     if '-d' in ops: passfd = int(ops['-d'])
     if '-H' in ops: options.show_headers = True
     if '-F' in ops: options.listfields = checkfields(ops['-F'])
@@ -361,16 +357,14 @@ def main(args):
     if command not in methods:
         usage("unrecognized command: '%s'" % command)
 
-    method, user_required = methods[command]
+    method, auth_required = methods[command]
 
     if not method_argcount_ok(method, args):
         usage("wrong number of args for %s command" % command)
 
-    if user:
-        user, passwd = getpw(user, passfd)
-        options.token = passwd
-    elif user_required:
-        usage("USER required for %s command" % command)
+    options.token = getpw(pat)
+    if auth_required and not options.token:
+        usage("PASS required for %s command" % command)
 
     method(*args)
 
