@@ -38,7 +38,7 @@ COMMANDs:
   (*)   protect-branch   OWNER REPO BRANCH
   (*)   unprotect-branch OWNER REPO BRANCH
         list-prs         OWNER REPO
-  (*)   request-pull     OWNER REPO[:BRANCH] [USER:]BRANCH TITLE BODY
+  (*)   request-pull     OWNER REPO:BRANCH USER:BRANCH TITLE BODY
   (*)   merge-pr         OWNER REPO NUMBER
   (*)   close-pr         OWNER REPO NUMBER
   (*)   list-hooks       OWNER REPO
@@ -285,15 +285,12 @@ def close_pr(owner, repo, number):
            {"state": "closed"})
 
 def request_pull(owner, baserepo, frombranch, title, body):
-    if ':' in baserepo:
-        repo, basebranch = baserepo.split(':')
-    else:
-        repo, basebranch = baserepo, "master"
+    repo, base = baserepo.split(':')
 
-    if ':' in frombranch:
-        head = frombranch
-    else:
-        head = "%s:%s" % (login_user, frombranch)
+    head = frombranch
+    if ':' not in frombranch:
+        # probably an error
+        pass
 
     print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo),
            {"title": title, "body": body, "head": head, "base": basebranch})])
@@ -372,8 +369,6 @@ def main(args):
     if user:
         user, passwd = getpw(user, passfd)
         options.token = passwd
-        global login_user
-        login_user = user
     elif user_required:
         usage("USER required for %s command" % command)
 
