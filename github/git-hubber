@@ -68,7 +68,7 @@ PATCH  = 'PATCH'
 DELETE = 'DELETE'
 
 class Options:
-    authstr = None
+    token = None
     show_headers = False
     listfields = ['html_url']
 
@@ -79,8 +79,8 @@ def add_gh_preview_header(req):
     req.add_header("Accept", "application/vnd.github.mercy-preview+json")
 
 def add_auth_header(req):
-    if options.authstr:
-        req.add_header("Authorization", "Basic %s" % options.authstr)
+    if options.token:
+        req.add_header("Authorization", "token %s" % options.token)
 
 def authsetup(user, passwd):
     from base64 import encodestring
@@ -371,7 +371,7 @@ def main(args):
 
     if user:
         user, passwd = getpw(user, passfd)
-        authsetup(user, passwd)
+        options.token = passwd
         global login_user
         login_user = user
     elif user_required:
