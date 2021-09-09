@@ -81,10 +81,6 @@ def add_auth_header(req):
     if options.token:
         req.add_header("Authorization", "token %s" % options.token)
 
-def authsetup(user, passwd):
-    from base64 import encodestring
-    options.authstr = encodestring('%s:%s' % (user,passwd)).replace('\n', '')
-
 def getpw(pat, passfd=None):
     if pat:
         return pat
