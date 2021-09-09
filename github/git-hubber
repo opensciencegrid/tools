@@ -39,6 +39,7 @@ COMMANDs:
   (*)   unprotect-branch OWNER REPO BRANCH
         list-prs         OWNER REPO
   (*)   request-pull     OWNER REPO:BRANCH USER:BRANCH TITLE BODY
+  (*)   request-pull     OWNER REPO:BRANCH USER:BRANCH {TITLE BODY|ISSUE}
   (*)   merge-pr         OWNER REPO NUMBER
   (*)   close-pr         OWNER REPO NUMBER
   (*)   list-hooks       OWNER REPO
@@ -76,6 +77,7 @@ options = Options()
 def add_gh_preview_header(req):
     req.add_header("Accept", "application/vnd.github.loki-preview+json")
     req.add_header("Accept", "application/vnd.github.mercy-preview+json")
+    req.add_header("Accept", "application/vnd.github.v3+json")
 
 def add_auth_header(req):
     if options.token:
@@ -155,7 +157,8 @@ github API notes:
 : protect-branch PATCH /repos/:owner/:repo/branches/:branch {"enabled": "true"}
 : request-pull   POST /repos/:owner/:repo/pulls {
                       "title": "New Feature", "body": "PR description",
-                      "base": "master", "head": "someuser:somebranch"}
+                      "base": "master", "head": "someuser:somebranch",
+                      "issue": 123}
 : merge-pr       PUT /repos/:owner/:repo/pulls/:number/merge
                  # {"commit_title": "title", "commit_message": "desc"}
 : close-pr       PATCH /repos/:owner/:repo/pulls/:number {"state": "closed"}
@@ -276,7 +279,7 @@ def close_pr(owner, repo, number):
     snarfer(PATCH, "/repos/%s/%s/pulls/%s" % (owner, repo, number),
            {"state": "closed"})
 
-def request_pull(owner, baserepo, frombranch, title, body):
+def request_pull(owner, baserepo, frombranch, title, body=None):
     repo, base = baserepo.split(':')
 
     head = frombranch
@@ -284,8 +287,12 @@ def request_pull(owner, baserepo, frombranch, title, body):
         # probably an error
         pass
 
-    print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo),
-           {"title": title, "body": body, "head": head, "base": basebranch})])
+    if body is None:
+        data = {"head": head, "base": base, "issue": int(title)}
+    else:
+        data = {"head": head, "base": base, "title": title, "body": body}
+
+    print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo), data)])
 
 def list_hooks(owner, repo):
     print_hook_info(snarfer(GET, '/repos/%s/%s/hooks' % (owner, repo)))
