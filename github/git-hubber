@@ -273,15 +273,16 @@ def set_description(owner, repo, desc):
            {"name": repo, "description": desc})
 
 def protect_branch(owner, repo, branch):
-    snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
-           { "protection": {
-               "enabled": True,
-               "required_status_checks": {
-                   "enforcement_level": "everyone",  # or "non_admins", or "off"
-                   "contexts": []  # eg, "continuous-integration/travis-ci"
-               }
-             }
-           })
+    data = {
+        "protection": {
+            "enabled": True,
+            "required_status_checks": {
+                "enforcement_level": "everyone",  # or "non_admins", or "off"
+                "contexts": []  # eg, "continuous-integration/travis-ci"
+            }
+        }
+    }
+    snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch), data)
 
 def unprotect_branch(owner, repo, branch):
     snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
