@@ -384,7 +384,7 @@ def main(args):
     if not method_argcount_ok(method, args):
         usage("wrong number of args for %s command" % command)
 
-    options.token = getpw(pat)
+    options.token = getpw(pat, passfd)
     if auth_required and not options.token:
         usage("PASS required for %s command" % command)
 
