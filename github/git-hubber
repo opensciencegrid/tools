@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import os
 import re
@@ -6,16 +6,18 @@ import sys
 import json
 import getopt
 import getpass
-import urllib2
+import urllib.request
+import urllib.error
 import operator
 import subprocess
+from functools import reduce
 
 def usage(msg=None):
     if msg:
-        print >>sys.stderr, msg + "\n"
+        print(msg + "\n", file=sys.stderr)
 
     s = os.path.basename(__file__)
-    print """\
+    print("""\
 usage: [PASS=...] %s [-p PASS] [-d passfd] [-H] COMMAND [args...]
 
 COMMANDs:
@@ -57,7 +59,7 @@ Options:
   -H   show http response headers
   -F field[:field...] display fields for repos instead of just "html_url"
      (valid fields are clone_url git_url html_url ssh_url full_name name, etc)
-""" % s
+""" % s)
     sys.exit()
 
 apiurl = 'https://api.github.com'
@@ -111,19 +113,19 @@ def get_nextlink(resp):
             return links['next']
 
 def _snarfer(method, url, data=None):
-    req = urllib2.Request(url, data)
+    req = urllib.request.Request(url, data)
     add_auth_header(req)
     add_gh_preview_header(req)
     req.get_method = lambda : method
-    resp = urllib2.urlopen(req)
+    resp = urllib.request.urlopen(req)
     if options.show_headers:
-        print "Response Headers for %s <%s>" % (method, url)
+        print("Response Headers for %s <%s>" % (method, url))
         if data:
-            print "With data:"
-            print json_pretty(data)
-        print "---"
-        print resp.headers
-        print
+            print("With data:")
+            print(json_pretty(data))
+        print("---")
+        print(resp.headers)
+        print()
     nextlink = get_nextlink(resp)
     return resp.read(), nextlink
 
@@ -185,42 +187,42 @@ github API notes:
 def print_names(seq):
     m = max( len(x['name']) for x in seq )
     for x in seq:
-        print "%-*s  %s" % (m, x['name'], x['html_url'])
+        print("%-*s  %s" % (m, x['name'], x['html_url']))
 
 def print_fields(seq):
     rows = sorted( [ x[f] for f in options.listfields ] for x in seq )
     for row in rows:
-        print '\t'.join(map(str, row))
+        print('\t'.join(map(str, row)))
 
 def print_fields_sortby(seq, fields, sortby):
     rows = sorted( [x[sortby]] + [ x[f] for f in fields ] for x in seq )
     for row in rows:
-        print '\t'.join(map(str, row[1:]))
+        print('\t'.join(map(str, row[1:])))
 
 def print_refs(seq):
     for x in seq:
-        print x["commit"]["sha"], x["name"]
+        print(x["commit"]["sha"], x["name"])
 
 def print_git_refs(seq):
     for x in seq:
-        print x["object"]["sha"], x["ref"]
+        print(x["object"]["sha"], x["ref"])
 
 def dump_infos(seq):
     for x in seq:
-        print x['html_url']
+        print(x['html_url'])
         w = max(len(xx) for xx in x)
         for xk,xv in sorted(x.items()):
-            print "  - %*s: %s" % (w,xk,xv)
-        print
+            print("  - %*s: %s" % (w,xk,xv))
+        print()
 
 def print_hook_info(seq):
     for hook in seq:
-        print "%s: [%s] -> %s" % (hook['id'], ' | '.join(hook['events']),
-                                  hook['config']['url'])
+        print("%s: [%s] -> %s" % (hook['id'], ' | '.join(hook['events']),
+                                  hook['config']['url']))
 
 def pmsg(j):
     if j and 'message' in j:
-        print j['message']
+        print(j['message'])
 
 def list_mine():
     print_fields(snarfer(GET, '/user/repos'))
@@ -385,20 +387,20 @@ def main(args):
     method(*args)
 
 def dump_http_error(e):
-    print >>sys.stderr, e
-    print >>sys.stderr, ""
+    print(e, file=sys.stderr)
+    print("", file=sys.stderr)
     if options.show_headers:
-        print >>sys.stderr, e.headers
-        print >>sys.stderr, ""
+        print(e.headers, file=sys.stderr)
+        print("", file=sys.stderr)
     data = e.read()
     if e.headers.gettype() == 'application/json':
         data = json.loads(data) if data else None
-    print >>sys.stderr, json_pretty(data)
+    print(json_pretty(data), file=sys.stderr)
 
 if __name__ == '__main__':
     try:
         main(sys.argv[1:])
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         dump_http_error(e)
         sys.exit(1)
 
