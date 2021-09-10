@@ -39,7 +39,7 @@ COMMANDs:
   (*)   unprotect-branch OWNER REPO BRANCH
         list-prs         OWNER REPO
   (*)   request-pull     OWNER REPO:BRANCH USER:BRANCH TITLE BODY
-  (*)   request-pull-for-issue \
+  (*)   request-pull-for-issue \\
                          OWNER REPO:BRANCH USER:BRANCH ISSUE_NUM
   (*)   merge-pr         OWNER REPO NUMBER
   (*)   close-pr         OWNER REPO NUMBER
@@ -300,10 +300,10 @@ def request_pull_kw(owner, repo_base, head, **kw):
     print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo), data)])
 
 def request_pull(owner, repo_base, head, title, body):
-    request_pull_kw(owner, repo_base, title=title, body=body)
+    request_pull_kw(owner, repo_base, head, title=title, body=body)
 
 def request_pull_for_issue(owner, repo_base, head, issue):
-    request_pull_kw(owner, repo_base, issue=int(issue))
+    request_pull_kw(owner, repo_base, head, issue=int(issue))
 
 def list_hooks(owner, repo):
     print_hook_info(snarfer(GET, '/repos/%s/%s/hooks' % (owner, repo)))
