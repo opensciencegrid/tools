@@ -17,7 +17,10 @@ def usage(msg=None):
         print(msg + "\n", file=sys.stderr)
 
     s = os.path.basename(__file__)
-    print("""\
+    print(_usage.format(script=s))
+    sys.exit()
+
+_usage = """\
 usage: [PASS=...] %s [-p PASS] [-d passfd] [-H] COMMAND [args...]
 
 COMMANDs:
@@ -59,8 +62,7 @@ Options:
   -H   show http response headers
   -F field[:field...] display fields for repos instead of just "html_url"
      (valid fields are clone_url git_url html_url ssh_url full_name name, etc)
-""" % s)
-    sys.exit()
+"""
 
 apiurl = 'https://api.github.com'
 
@@ -112,6 +114,15 @@ def get_nextlink(resp):
         if 'next' in links:
             return links['next']
 
+def dump_resp_headers(method, url, data, resp):
+    print("Response Headers for %s <%s>" % (method, url))
+    if data:
+        print("With data:")
+        print(json_pretty(data))
+    print("---")
+    print(resp.headers)
+    print()
+
 def _snarfer(method, url, data=None):
     req = urllib.request.Request(url, data)
     add_auth_header(req)
@@ -119,13 +130,7 @@ def _snarfer(method, url, data=None):
     req.get_method = lambda : method
     resp = urllib.request.urlopen(req)
     if options.show_headers:
-        print("Response Headers for %s <%s>" % (method, url))
-        if data:
-            print("With data:")
-            print(json_pretty(data))
-        print("---")
-        print(resp.headers)
-        print()
+        dump_resp_headers(method, url, data, resp)
     nextlink = get_nextlink(resp)
     return resp.read(), nextlink
 
