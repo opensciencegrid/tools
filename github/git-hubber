@@ -382,10 +382,21 @@ def main(args):
 
     method(*args)
 
+def dump_http_error(e):
+    print >>sys.stderr, e
+    print >>sys.stderr, ""
+    if options.show_headers:
+        print >>sys.stderr, e.headers
+        print >>sys.stderr, ""
+    data = e.read()
+    if e.headers.gettype() == 'application/json':
+        data = json.loads(data) if data else None
+    print >>sys.stderr, json_pretty(data)
+
 if __name__ == '__main__':
     try:
         main(sys.argv[1:])
     except urllib2.HTTPError as e:
-        print >>sys.stderr, e
+        dump_http_error(e)
         sys.exit(1)
 
