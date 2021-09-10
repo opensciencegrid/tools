@@ -232,50 +232,50 @@ def list_mine():
     print_fields(snarfer(GET, '/user/repos'))
 
 def list_user(username):
-    print_fields(snarfer(GET, '/users/%s/repos' % username))
+    print_fields(snarfer(GET, f'/users/{username}/repos'))
 
 def list_prs(owner, repo):
-    print_fields_sortby(snarfer(GET, '/repos/%s/%s/pulls' % (owner, repo)),
+    print_fields_sortby(snarfer(GET, f'/repos/{owner}/{repo}/pulls'),
             ['html_url', 'title'], 'number')
 
 def list_org(org):
-    print_fields(snarfer(GET, '/orgs/%s/repos' % org))
+    print_fields(snarfer(GET, f'/orgs/{org}/repos'))
 
 def list_branches(owner, repo):
-    print_refs(snarfer(GET, '/repos/%s/%s/branches' % (owner,repo)))
+    print_refs(snarfer(GET, f'/repos/{owner}/{repo}/branches'))
 
 def list_tags(owner, repo):
-    print_refs(snarfer(GET, '/repos/%s/%s/tags' % (owner,repo)))
+    print_refs(snarfer(GET, f'/repos/{owner}/{repo}/tags'))
 
 def list_git_refs(owner, repo):
-    print_git_refs(snarfer(GET, '/repos/%s/%s/git/refs' % (owner,repo)))
+    print_git_refs(snarfer(GET, f'/repos/{owner}/{repo}/git/refs'))
 
 def dump_user(username):
-    dump_infos(snarfer(GET, '/users/%s/repos' % username))
+    dump_infos(snarfer(GET, f'/users/{username}/repos'))
 
 def dump_org(org):
-    dump_infos(snarfer(GET, '/orgs/%s/repos' % org))
+    dump_infos(snarfer(GET, f'/orgs/{org}/repos'))
 
 def create_mine(repo):
     snarfer(POST, '/user/repos', {"name": repo})
 
 def create_org(org, repo):
-    snarfer(POST, '/orgs/%s/repos' % org, {"name": repo})
+    snarfer(POST, f'/orgs/{org}/repos', {"name": repo})
 
 def fork_mine(owner, repo):
-    snarfer(POST, '/repos/%s/%s/forks' % (owner,repo))
+    snarfer(POST, f'/repos/{owner}/{repo}/forks')
 
 def list_forks(owner, repo):
-    print_fields(snarfer(GET, '/repos/%s/%s/forks' % (owner, repo)))
+    print_fields(snarfer(GET, f'/repos/{owner}/{repo}/forks'))
 
 def delete_repo(owner, repo):
-    snarfer(DELETE, '/repos/%s/%s' % (owner,repo))
+    snarfer(DELETE, f'/repos/{owner}/{repo}')
 
 def rename_repo(owner, repo, newname):
-    snarfer(PATCH, '/repos/%s/%s' % (owner,repo), {"name": newname})
+    snarfer(PATCH, f'/repos/{owner}/{repo}', {"name": newname})
 
 def set_description(owner, repo, desc):
-    snarfer(PATCH, '/repos/%s/%s' % (owner,repo),
+    snarfer(PATCH, f'/repos/{owner}/{repo}',
            {"name": repo, "description": desc})
 
 def protect_branch(owner, repo, branch):
@@ -288,23 +288,23 @@ def protect_branch(owner, repo, branch):
             }
         }
     }
-    snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch), data)
+    snarfer(PATCH, f'/repos/{owner}/{repo}/branches/{branch}', data)
 
 def unprotect_branch(owner, repo, branch):
-    snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
+    snarfer(PATCH, f'/repos/{owner}/{repo}/branches/{branch}',
            {"protection": {"enabled": False}})
 
 def merge_pr(owner, repo, number):
-    snarfer(PUT, "/repos/%s/%s/pulls/%s/merge" % (owner, repo, number))
+    snarfer(PUT, f"/repos/{owner}/{repo}/pulls/{number}/merge")
 
 def close_pr(owner, repo, number):
-    snarfer(PATCH, "/repos/%s/%s/pulls/%s" % (owner, repo, number),
+    snarfer(PATCH, f"/repos/{owner}/{repo}/pulls/{number}",
            {"state": "closed"})
 
 def request_pull_kw(owner, repo_base, head, **kw):
     repo, base = repo_base.split(':')
     data = dict(head=head, base=base, **kw)
-    print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo), data)])
+    print_fields([snarfer(POST, f'/repos/{owner}/{repo}/pulls', data)])
 
 def request_pull(owner, repo_base, head, title, body):
     request_pull_kw(owner, repo_base, head, title=title, body=body)
@@ -313,10 +313,10 @@ def request_pull_for_issue(owner, repo_base, head, issue):
     request_pull_kw(owner, repo_base, head, issue=int(issue))
 
 def list_hooks(owner, repo):
-    print_hook_info(snarfer(GET, '/repos/%s/%s/hooks' % (owner, repo)))
+    print_hook_info(snarfer(GET, f'/repos/{owner}/{repo}/hooks'))
 
 def ping_hook(owner, repo, hook_id):
-    snarfer(POST, "/repos/%s/%s/hooks/%s/pings" % (owner, repo, hook_id))
+    snarfer(POST, f"/repos/{owner}/{repo}/hooks/{hook_id}/pings")
 
 methods = {
 #   'command-name':           [method,         auth_required],
