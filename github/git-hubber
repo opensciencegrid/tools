@@ -23,33 +23,32 @@ def usage(msg=None):
 _usage = """\
 usage: [PASS=...] %s [-p PASS] [-d passfd] [-H] COMMAND [args...]
 
-COMMANDs:
+COMMAND:
 
-  (*)   list-mine
-        list-user        USER
-        list-org         ORG
-        dump-user        USER
-        dump-org         ORG
-        list-branches    OWNER REPO
-        list-tags        OWNER REPO
-        list-refs        OWNER REPO
-  (*)   create-mine      REPO
-  (*)   create-org       ORG   REPO
-  (*)   fork-from        OWNER REPO
-        list-forks       OWNER REPO
-  (*)   delete           OWNER REPO
-  (*)   rename           OWNER REPO NEWNAME
-  (*)   set-description  OWNER REPO DESCRIPTION
-  (*)   protect-branch   OWNER REPO BRANCH
-  (*)   unprotect-branch OWNER REPO BRANCH
-        list-prs         OWNER REPO
-  (*)   request-pull     OWNER REPO:BRANCH USER:BRANCH TITLE BODY
-  (*)   request-pull-for-issue \\
-                         OWNER REPO:BRANCH USER:BRANCH ISSUE_NUM
-  (*)   merge-pr         OWNER REPO NUMBER
-  (*)   close-pr         OWNER REPO NUMBER
-  (*)   list-hooks       OWNER REPO
-  (*)   ping-hook        OWNER REPO HOOK_ID
+  (*)  list-mine
+       list-user               USER
+       list-org                ORG
+       dump-user               USER
+       dump-org                ORG
+       list-branches           OWNER REPO
+       list-tags               OWNER REPO
+       list-refs               OWNER REPO
+  (*)  create-mine             REPO
+  (*)  create-org              ORG   REPO
+  (*)  fork-from               OWNER REPO
+       list-forks              OWNER REPO
+  (*)  delete                  OWNER REPO
+  (*)  rename                  OWNER REPO NEWNAME
+  (*)  set-description         OWNER REPO DESCRIPTION
+  (*)  protect-branch          OWNER REPO BRANCH
+  (*)  unprotect-branch        OWNER REPO BRANCH
+       list-prs                OWNER REPO
+  (*)  request-pull            OWNER REPO:BRANCH USER:BRANCH TITLE BODY
+  (*)  request-pull-for-issue  OWNER REPO:BRANCH USER:BRANCH ISSUE_NUM
+  (*)  merge-pr                OWNER REPO NUMBER
+  (*)  close-pr                OWNER REPO NUMBER
+  (*)  list-hooks              OWNER REPO
+  (*)  ping-hook               OWNER REPO HOOK_ID
         
 (*) auth required
 
@@ -320,30 +319,30 @@ def ping_hook(owner, repo, hook_id):
     snarfer(POST, "/repos/%s/%s/hooks/%s/pings" % (owner, repo, hook_id))
 
 methods = {
-#   'command-name':     [method,   auth_required],
-    'list-mine':        [list_mine,        True],
-    'list-user':        [list_user,        False],
-    'list-org':         [list_org,         False],
-    'dump-user':        [dump_user,        False],
-    'dump-org':         [dump_org,         False],
-    'list-branches':    [list_branches,    False],
-    'list-tags':        [list_tags,        False],
-    'list-refs':        [list_git_refs,    False],
-    'create-mine':      [create_mine,      True],
-    'create-org':       [create_org,       True],
-    'fork-from':        [fork_mine,        True],
-    'list-forks':       [list_forks,       False],
-    'delete':           [delete_repo,      True],
-    'rename':           [rename_repo,      True],
-    'set-description':  [set_description,  True],
-    'protect-branch':   [protect_branch,   True],
-    'unprotect-branch': [unprotect_branch, True],
-    'request-pull':     [request_pull,     True],
-    'list-prs':         [list_prs,         False],
-    'merge-pr':         [merge_pr,         True],
-    'close-pr':         [close_pr,         True],
-    'list-hooks':       [list_hooks,       True],
-    'ping-hook':        [ping_hook,        True],
+#   'command-name':           [method,         auth_required],
+    'list-mine':              [list_mine,              True],
+    'list-user':              [list_user,              False],
+    'list-org':               [list_org,               False],
+    'dump-user':              [dump_user,              False],
+    'dump-org':               [dump_org,               False],
+    'list-branches':          [list_branches,          False],
+    'list-tags':              [list_tags,              False],
+    'list-refs':              [list_git_refs,          False],
+    'create-mine':            [create_mine,            True],
+    'create-org':             [create_org,             True],
+    'fork-from':              [fork_mine,              True],
+    'list-forks':             [list_forks,             False],
+    'delete':                 [delete_repo,            True],
+    'rename':                 [rename_repo,            True],
+    'set-description':        [set_description,        True],
+    'protect-branch':         [protect_branch,         True],
+    'unprotect-branch':       [unprotect_branch,       True],
+    'request-pull':           [request_pull,           True],
+    'list-prs':               [list_prs,               False],
+    'merge-pr':               [merge_pr,               True],
+    'close-pr':               [close_pr,               True],
+    'list-hooks':             [list_hooks,             True],
+    'ping-hook':              [ping_hook,              True],
     'request-pull-for-issue': [request_pull_for_issue, True],
 }
 
