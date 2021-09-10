@@ -294,25 +294,15 @@ def close_pr(owner, repo, number):
     snarfer(PATCH, "/repos/%s/%s/pulls/%s" % (owner, repo, number),
            {"state": "closed"})
 
-def request_pull(owner, baserepo, frombranch, title, body):
+def request_pull(owner, baserepo, head, title, body):
     repo, base = baserepo.split(':')
-
-    head = frombranch
-    if ':' not in frombranch:
-        # probably an error
-        pass
 
     data = {"head": head, "base": base, "title": title, "body": body}
 
     print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo), data)])
 
-def request_pull_for_issue(owner, baserepo, frombranch, issue)
+def request_pull_for_issue(owner, baserepo, head, issue)
     repo, base = baserepo.split(':')
-
-    head = frombranch
-    if ':' not in frombranch:
-        # probably an error
-        pass
 
     data = {"head": head, "base": base, "issue": int(issue)}
 
