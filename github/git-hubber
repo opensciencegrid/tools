@@ -39,7 +39,8 @@ COMMANDs:
   (*)   unprotect-branch OWNER REPO BRANCH
         list-prs         OWNER REPO
   (*)   request-pull     OWNER REPO:BRANCH USER:BRANCH TITLE BODY
-  (*)   request-pull     OWNER REPO:BRANCH USER:BRANCH {TITLE BODY|ISSUE}
+  (*)   request-pull-for-issue \
+                         OWNER REPO:BRANCH USER:BRANCH ISSUE_NUM
   (*)   merge-pr         OWNER REPO NUMBER
   (*)   close-pr         OWNER REPO NUMBER
   (*)   list-hooks       OWNER REPO
@@ -168,6 +169,9 @@ github API notes:
 : protect-branch PATCH /repos/:owner/:repo/branches/:branch {"enabled": "true"}
 : request-pull   POST /repos/:owner/:repo/pulls {
                       "title": "New Feature", "body": "PR description",
+                      "base": "master", "head": "someuser:somebranch"}
+: request-pull-for-issue
+                 POST /repos/:owner/:repo/pulls {
                       "base": "master", "head": "someuser:somebranch",
                       "issue": 123}
 : merge-pr       PUT /repos/:owner/:repo/pulls/:number/merge
@@ -290,7 +294,7 @@ def close_pr(owner, repo, number):
     snarfer(PATCH, "/repos/%s/%s/pulls/%s" % (owner, repo, number),
            {"state": "closed"})
 
-def request_pull(owner, baserepo, frombranch, title, body=None):
+def request_pull(owner, baserepo, frombranch, title, body):
     repo, base = baserepo.split(':')
 
     head = frombranch
@@ -298,10 +302,19 @@ def request_pull(owner, baserepo, frombranch, title, body=None):
         # probably an error
         pass
 
-    if body is None:
-        data = {"head": head, "base": base, "issue": int(title)}
-    else:
-        data = {"head": head, "base": base, "title": title, "body": body}
+    data = {"head": head, "base": base, "title": title, "body": body}
+
+    print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo), data)])
+
+def request_pull_for_issue(owner, baserepo, frombranch, issue)
+    repo, base = baserepo.split(':')
+
+    head = frombranch
+    if ':' not in frombranch:
+        # probably an error
+        pass
+
+    data = {"head": head, "base": base, "issue": int(issue)}
 
     print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo), data)])
 
@@ -336,6 +349,7 @@ methods = {
     'close-pr':         [close_pr,         True],
     'list-hooks':       [list_hooks,       True],
     'ping-hook':        [ping_hook,        True],
+    'request-pull-for-issue': [request_pull_for_issue, True],
 }
 
 def checkfields(f):
