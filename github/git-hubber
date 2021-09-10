@@ -74,10 +74,14 @@ class Options:
 
 options = Options()
 
+_accept = [
+    "application/vnd.github.loki-preview+json",
+    "application/vnd.github.mercy-preview+json",
+    "application/vnd.github.v3+json",
+]
+
 def add_gh_preview_header(req):
-    req.add_header("Accept", "application/vnd.github.loki-preview+json")
-    req.add_header("Accept", "application/vnd.github.mercy-preview+json")
-    req.add_header("Accept", "application/vnd.github.v3+json")
+    req.add_header("Accept", ", ".join(_accept))
 
 def add_auth_header(req):
     if options.token:
