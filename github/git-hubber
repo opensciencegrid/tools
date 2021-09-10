@@ -294,16 +294,16 @@ def close_pr(owner, repo, number):
     snarfer(PATCH, "/repos/%s/%s/pulls/%s" % (owner, repo, number),
            {"state": "closed"})
 
-def request_pull_kw(owner, baserepo, head, **kw):
-    repo, base = baserepo.split(':')
+def request_pull_kw(owner, repo_base, head, **kw):
+    repo, base = repo_base.split(':')
     data = dict(head=head, base=base, **kw)
     print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo), data)])
 
-def request_pull(owner, baserepo, head, title, body):
-    request_pull_kw(owner, baserepo, title=title, body=body)
+def request_pull(owner, repo_base, head, title, body):
+    request_pull_kw(owner, repo_base, title=title, body=body)
 
-def request_pull_for_issue(owner, baserepo, head, issue)
-    request_pull_kw(owner, baserepo, issue=int(issue))
+def request_pull_for_issue(owner, repo_base, head, issue):
+    request_pull_kw(owner, repo_base, issue=int(issue))
 
 def list_hooks(owner, repo):
     print_hook_info(snarfer(GET, '/repos/%s/%s/hooks' % (owner, repo)))
