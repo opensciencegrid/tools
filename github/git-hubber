@@ -95,6 +95,9 @@ def getpw(pat, passfd=None):
     elif 'PASS' in os.environ:
         return os.environ['PASS']
 
+def json_pretty(data):
+    return json.dumps(data, sort_keys=True, indent=2)
+
 def linkparse(linktext):
     mm = re.findall(r'<([^>]+)>;\s*rel="([^"]+)"', linktext)
     return dict((page, rel) for rel,page in mm)
@@ -113,9 +116,13 @@ def _snarfer(method, url, data=None):
     req.get_method = lambda : method
     resp = urllib2.urlopen(req)
     if options.show_headers:
-        print "Headers for <%s>" % url
+        print "Response Headers for %s <%s>" % (method, url)
+        if data:
+            print "With data:"
+            print json_pretty(data)
         print "---"
         print resp.headers
+        print
     nextlink = get_nextlink(resp)
     return resp.read(), nextlink
 
