@@ -111,7 +111,7 @@ def linkparse(linktext):
     return dict((page, rel) for rel,page in mm)
 
 def get_nextlink(resp):
-    linktext = resp.headers.getheader('link')
+    linktext = resp.getheader('link')
     if linktext:
         links = linkparse(linktext)
         if 'next' in links:
