@@ -21,7 +21,7 @@ def usage(msg=None):
     sys.exit()
 
 _usage = """\
-usage: [PASS=...] %s [-p PASS] [-d passfd] [-H] COMMAND [args...]
+usage: [PASS=...] {script} [-p PASS] [-d passfd] [-H] COMMAND [args...]
 
 COMMAND:
 
