@@ -12,9 +12,13 @@ import operator
 import subprocess
 from functools import reduce
 
+class Usage(Exception):
+    pass
+
 def usage(msg=None):
     if msg:
-        print(msg + "\n", file=sys.stderr)
+        print(msg, file=sys.stderr)
+        print("", file=sys.stderr)
 
     s = os.path.basename(__file__)
     print(_usage.format(script=s))
@@ -348,10 +352,10 @@ methods = {
 
 def checkfields(f):
     if not f:
-        usage()
+        raise Usage()
     fields = f.split(':')
     if not all( re.search(r'^\w+$', x) for x in fields ):
-        usage()
+        raise Usage()
     return fields
 
 def method_argcount_ok(method, args):
@@ -361,10 +365,13 @@ def method_argcount_ok(method, args):
 
 
 def parseargs(args):
-    ops, args = getopt.getopt(args, 'p:d:HF:')
+    try:
+        ops, args = getopt.getopt(args, 'p:d:HF:')
+    except getopt.GetoptError as e:
+        raise Usage(e)
     ops = dict(ops)
     if len(args) < 1:
-        usage()
+        raise Usage()
 
     pat    = None
     passfd = None
@@ -381,15 +388,15 @@ def parseargs(args):
 
 def getmethod(command, args):
     if command not in methods:
-        usage("unrecognized command: '%s'" % command)
+        raise Usage("unrecognized command: '%s'" % command)
 
     method, auth_required = methods[command]
 
     if not method_argcount_ok(method, args):
-        usage("wrong number of args for %s command" % command)
+        raise Usage("wrong number of args for %s command" % command)
 
     if auth_required and not options.token:
-        usage("PASS required for %s command" % command)
+        raise Usage("PASS required for %s command" % command)
 
     return method
 
@@ -415,6 +422,8 @@ def dump_http_error(e):
 if __name__ == '__main__':
     try:
         main(sys.argv[1:])
+    except Usage as e:
+        usage(e)
     except urllib.error.HTTPError as e:
         dump_http_error(e)
         sys.exit(1)
