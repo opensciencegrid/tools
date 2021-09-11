@@ -16,7 +16,7 @@ def usage(msg=None):
 
     s = os.path.basename(__file__)
     print """\
-usage: [PASS=...] %s [-u USER[:PASS]] [-d passfd] [-H] COMMAND [args...]
+usage: [PASS=...] %s [-p PASS] [-d passfd] [-H] COMMAND [args...]
 
 COMMANDs:
 
@@ -38,19 +38,20 @@ COMMANDs:
   (*)   protect-branch   OWNER REPO BRANCH
   (*)   unprotect-branch OWNER REPO BRANCH
         list-prs         OWNER REPO
-  (*)   request-pull     OWNER REPO[:BRANCH] [USER:]BRANCH TITLE BODY
+  (*)   request-pull     OWNER REPO:BRANCH USER:BRANCH TITLE BODY
+  (*)   request-pull-for-issue \\
+                         OWNER REPO:BRANCH USER:BRANCH ISSUE_NUM
   (*)   merge-pr         OWNER REPO NUMBER
   (*)   close-pr         OWNER REPO NUMBER
   (*)   list-hooks       OWNER REPO
   (*)   ping-hook        OWNER REPO HOOK_ID
         
-(*) USER login required
+(*) auth required
 
-PASS for USER is taken from the first of:
-  1. -u USER:PASS
+PASS (a github PAT) for auth is taken from the first of:
+  1. -p PASS
   2. -d passfd (read from fd)
   3. read from $PASS env var
-  4. read from terminal
 
 Options:
   -H   show http response headers
@@ -68,34 +69,35 @@ PATCH  = 'PATCH'
 DELETE = 'DELETE'
 
 class Options:
-    authstr = None
+    token = None
     show_headers = False
     listfields = ['html_url']
 
 options = Options()
 
+_accept = [
+    "application/vnd.github.loki-preview+json",
+    "application/vnd.github.mercy-preview+json",
+    "application/vnd.github.v3+json",
+]
+
 def add_gh_preview_header(req):
-    req.add_header("Accept", "application/vnd.github.loki-preview+json")
-    req.add_header("Accept", "application/vnd.github.mercy-preview+json")
+    req.add_header("Accept", ", ".join(_accept))
 
 def add_auth_header(req):
-    if options.authstr:
-        req.add_header("Authorization", "Basic %s" % options.authstr)
+    if options.token:
+        req.add_header("Authorization", "token %s" % options.token)
 
-def authsetup(user, passwd):
-    from base64 import encodestring
-    options.authstr = encodestring('%s:%s' % (user,passwd)).replace('\n', '')
-
-def getpw(user, passfd=None):
-    if ':' in user:
-        user, pw = user.split(':', 1)
+def getpw(pat, passfd=None):
+    if pat:
+        return pat
     elif passfd is not None:
-        pw = os.fdopen(passfd).readline().rstrip('\n')
+        return os.fdopen(passfd).readline().rstrip('\n')
     elif 'PASS' in os.environ:
-        pw = os.environ['PASS']
-    else:
-        pw = getpass.getpass('passwd for user %s: ' % user)
-    return user, pw
+        return os.environ['PASS']
+
+def json_pretty(data):
+    return json.dumps(data, sort_keys=True, indent=2)
 
 def linkparse(linktext):
     mm = re.findall(r'<([^>]+)>;\s*rel="([^"]+)"', linktext)
@@ -115,9 +117,13 @@ def _snarfer(method, url, data=None):
     req.get_method = lambda : method
     resp = urllib2.urlopen(req)
     if options.show_headers:
-        print "Headers for <%s>" % url
+        print "Response Headers for %s <%s>" % (method, url)
+        if data:
+            print "With data:"
+            print json_pretty(data)
         print "---"
         print resp.headers
+        print
     nextlink = get_nextlink(resp)
     return resp.read(), nextlink
 
@@ -164,6 +170,10 @@ github API notes:
 : request-pull   POST /repos/:owner/:repo/pulls {
                       "title": "New Feature", "body": "PR description",
                       "base": "master", "head": "someuser:somebranch"}
+: request-pull-for-issue
+                 POST /repos/:owner/:repo/pulls {
+                      "base": "master", "head": "someuser:somebranch",
+                      "issue": 123}
 : merge-pr       PUT /repos/:owner/:repo/pulls/:number/merge
                  # {"commit_title": "title", "commit_message": "desc"}
 : close-pr       PATCH /repos/:owner/:repo/pulls/:number {"state": "closed"}
@@ -284,19 +294,16 @@ def close_pr(owner, repo, number):
     snarfer(PATCH, "/repos/%s/%s/pulls/%s" % (owner, repo, number),
            {"state": "closed"})
 
-def request_pull(owner, baserepo, frombranch, title, body):
-    if ':' in baserepo:
-        repo, basebranch = baserepo.split(':')
-    else:
-        repo, basebranch = baserepo, "master"
+def request_pull_kw(owner, repo_base, head, **kw):
+    repo, base = repo_base.split(':')
+    data = dict(head=head, base=base, **kw)
+    print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo), data)])
 
-    if ':' in frombranch:
-        head = frombranch
-    else:
-        head = "%s:%s" % (login_user, frombranch)
+def request_pull(owner, repo_base, head, title, body):
+    request_pull_kw(owner, repo_base, head, title=title, body=body)
 
-    print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo),
-           {"title": title, "body": body, "head": head, "base": basebranch})])
+def request_pull_for_issue(owner, repo_base, head, issue):
+    request_pull_kw(owner, repo_base, head, issue=int(issue))
 
 def list_hooks(owner, repo):
     print_hook_info(snarfer(GET, '/repos/%s/%s/hooks' % (owner, repo)))
@@ -305,7 +312,7 @@ def ping_hook(owner, repo, hook_id):
     snarfer(POST, "/repos/%s/%s/hooks/%s/pings" % (owner, repo, hook_id))
 
 methods = {
-#   'command-name':     [method,   user_required],
+#   'command-name':     [method,   auth_required],
     'list-mine':        [list_mine,        True],
     'list-user':        [list_user,        False],
     'list-org':         [list_org,         False],
@@ -329,6 +336,7 @@ methods = {
     'close-pr':         [close_pr,         True],
     'list-hooks':       [list_hooks,       True],
     'ping-hook':        [ping_hook,        True],
+    'request-pull-for-issue': [request_pull_for_issue, True],
 }
 
 def checkfields(f):
@@ -345,15 +353,15 @@ def method_argcount_ok(method, args):
     return cmd_args - def_args <= len(args) <= cmd_args
 
 def main(args):
-    ops, args = getopt.getopt(args, 'u:d:HF:')
+    ops, args = getopt.getopt(args, 'p:d:HF:')
     ops = dict(ops)
     if len(args) < 1:
         usage()
 
-    user   = None
+    pat    = None
     passfd = None
 
-    if '-u' in ops: user   =     ops['-u']
+    if '-p' in ops: pat    =     ops['-p']
     if '-d' in ops: passfd = int(ops['-d'])
     if '-H' in ops: options.show_headers = True
     if '-F' in ops: options.listfields = checkfields(ops['-F'])
@@ -364,25 +372,32 @@ def main(args):
     if command not in methods:
         usage("unrecognized command: '%s'" % command)
 
-    method, user_required = methods[command]
+    method, auth_required = methods[command]
 
     if not method_argcount_ok(method, args):
         usage("wrong number of args for %s command" % command)
 
-    if user:
-        user, passwd = getpw(user, passfd)
-        authsetup(user, passwd)
-        global login_user
-        login_user = user
-    elif user_required:
-        usage("USER required for %s command" % command)
+    options.token = getpw(pat)
+    if auth_required and not options.token:
+        usage("PASS required for %s command" % command)
 
     method(*args)
+
+def dump_http_error(e):
+    print >>sys.stderr, e
+    print >>sys.stderr, ""
+    if options.show_headers:
+        print >>sys.stderr, e.headers
+        print >>sys.stderr, ""
+    data = e.read()
+    if e.headers.gettype() == 'application/json':
+        data = json.loads(data) if data else None
+    print >>sys.stderr, json_pretty(data)
 
 if __name__ == '__main__':
     try:
         main(sys.argv[1:])
     except urllib2.HTTPError as e:
-        print >>sys.stderr, e
+        dump_http_error(e)
         sys.exit(1)
 
