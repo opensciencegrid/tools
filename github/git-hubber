@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import os
 import re
@@ -6,45 +6,53 @@ import sys
 import json
 import getopt
 import getpass
-import urllib2
+import urllib.request
+import urllib.error
 import operator
 import subprocess
+from functools import reduce
+
+class Usage(Exception):
+    pass
 
 def usage(msg=None):
     if msg:
-        print >>sys.stderr, msg + "\n"
+        print(msg, file=sys.stderr)
+        print("", file=sys.stderr)
 
     s = os.path.basename(__file__)
-    print """\
-usage: [PASS=...] %s [-p PASS] [-d passfd] [-H] COMMAND [args...]
+    print(_usage.format(script=s))
+    sys.exit()
 
-COMMANDs:
+_usage = """\
+usage: [PASS=...] {script} [-p PASS] [-d passfd] [-H] COMMAND [args...]
 
-  (*)   list-mine
-        list-user        USER
-        list-org         ORG
-        dump-user        USER
-        dump-org         ORG
-        list-branches    OWNER REPO
-        list-tags        OWNER REPO
-        list-refs        OWNER REPO
-  (*)   create-mine      REPO
-  (*)   create-org       ORG   REPO
-  (*)   fork-from        OWNER REPO
-        list-forks       OWNER REPO
-  (*)   delete           OWNER REPO
-  (*)   rename           OWNER REPO NEWNAME
-  (*)   set-description  OWNER REPO DESCRIPTION
-  (*)   protect-branch   OWNER REPO BRANCH
-  (*)   unprotect-branch OWNER REPO BRANCH
-        list-prs         OWNER REPO
-  (*)   request-pull     OWNER REPO:BRANCH USER:BRANCH TITLE BODY
-  (*)   request-pull-for-issue \\
-                         OWNER REPO:BRANCH USER:BRANCH ISSUE_NUM
-  (*)   merge-pr         OWNER REPO NUMBER
-  (*)   close-pr         OWNER REPO NUMBER
-  (*)   list-hooks       OWNER REPO
-  (*)   ping-hook        OWNER REPO HOOK_ID
+COMMAND:
+
+  (*)  list-mine
+       list-user               USER
+       list-org                ORG
+       dump-user               USER
+       dump-org                ORG
+       list-branches           OWNER REPO
+       list-tags               OWNER REPO
+       list-refs               OWNER REPO
+  (*)  create-mine             REPO
+  (*)  create-org              ORG   REPO
+  (*)  fork-from               OWNER REPO
+       list-forks              OWNER REPO
+  (*)  delete                  OWNER REPO
+  (*)  rename                  OWNER REPO NEWNAME
+  (*)  set-description         OWNER REPO DESCRIPTION
+  (*)  protect-branch          OWNER REPO BRANCH
+  (*)  unprotect-branch        OWNER REPO BRANCH
+       list-prs                OWNER REPO
+  (*)  request-pull            OWNER REPO:BRANCH USER:BRANCH TITLE BODY
+  (*)  request-pull-for-issue  OWNER REPO:BRANCH USER:BRANCH ISSUE_NUM
+  (*)  merge-pr                OWNER REPO NUMBER
+  (*)  close-pr                OWNER REPO NUMBER
+  (*)  list-hooks              OWNER REPO
+  (*)  ping-hook               OWNER REPO HOOK_ID
         
 (*) auth required
 
@@ -57,8 +65,7 @@ Options:
   -H   show http response headers
   -F field[:field...] display fields for repos instead of just "html_url"
      (valid fields are clone_url git_url html_url ssh_url full_name name, etc)
-""" % s
-    sys.exit()
+"""
 
 apiurl = 'https://api.github.com'
 
@@ -104,26 +111,29 @@ def linkparse(linktext):
     return dict((page, rel) for rel,page in mm)
 
 def get_nextlink(resp):
-    linktext = resp.headers.getheader('link')
+    linktext = resp.getheader('link')
     if linktext:
         links = linkparse(linktext)
         if 'next' in links:
             return links['next']
 
+def dump_resp_headers(method, url, data, resp):
+    print("Response Headers for %s <%s>" % (method, url))
+    if data:
+        print("With data:")
+        print(json_pretty(data))
+    print("---")
+    print(resp.headers)
+    print()
+
 def _snarfer(method, url, data=None):
-    req = urllib2.Request(url, data)
+    req = urllib.request.Request(url, data)
     add_auth_header(req)
     add_gh_preview_header(req)
     req.get_method = lambda : method
-    resp = urllib2.urlopen(req)
+    resp = urllib.request.urlopen(req)
     if options.show_headers:
-        print "Response Headers for %s <%s>" % (method, url)
-        if data:
-            print "With data:"
-            print json_pretty(data)
-        print "---"
-        print resp.headers
-        print
+        dump_resp_headers(method, url, data, resp)
     nextlink = get_nextlink(resp)
     return resp.read(), nextlink
 
@@ -138,7 +148,7 @@ def snarfergen(method, url, data=None):
     
 def snarfer(method, path, data=None):
     if data:
-        data = json.dumps(data)
+        data = json.dumps(data).encode('utf-8')
     url = apiurl + path
     outs = list(snarfergen(method, url, data))
     nresp = len(outs)
@@ -185,119 +195,120 @@ github API notes:
 def print_names(seq):
     m = max( len(x['name']) for x in seq )
     for x in seq:
-        print "%-*s  %s" % (m, x['name'], x['html_url'])
+        print("%-*s  %s" % (m, x['name'], x['html_url']))
 
 def print_fields(seq):
     rows = sorted( [ x[f] for f in options.listfields ] for x in seq )
     for row in rows:
-        print '\t'.join(map(str, row))
+        print('\t'.join(map(str, row)))
 
 def print_fields_sortby(seq, fields, sortby):
     rows = sorted( [x[sortby]] + [ x[f] for f in fields ] for x in seq )
     for row in rows:
-        print '\t'.join(map(str, row[1:]))
+        print('\t'.join(map(str, row[1:])))
 
 def print_refs(seq):
     for x in seq:
-        print x["commit"]["sha"], x["name"]
+        print(x["commit"]["sha"], x["name"])
 
 def print_git_refs(seq):
     for x in seq:
-        print x["object"]["sha"], x["ref"]
+        print(x["object"]["sha"], x["ref"])
 
 def dump_infos(seq):
     for x in seq:
-        print x['html_url']
+        print(x['html_url'])
         w = max(len(xx) for xx in x)
         for xk,xv in sorted(x.items()):
-            print "  - %*s: %s" % (w,xk,xv)
-        print
+            print("  - %*s: %s" % (w,xk,xv))
+        print()
 
 def print_hook_info(seq):
     for hook in seq:
-        print "%s: [%s] -> %s" % (hook['id'], ' | '.join(hook['events']),
-                                  hook['config']['url'])
+        print("%s: [%s] -> %s" % (hook['id'], ' | '.join(hook['events']),
+                                  hook['config']['url']))
 
 def pmsg(j):
     if j and 'message' in j:
-        print j['message']
+        print(j['message'])
 
 def list_mine():
     print_fields(snarfer(GET, '/user/repos'))
 
 def list_user(username):
-    print_fields(snarfer(GET, '/users/%s/repos' % username))
+    print_fields(snarfer(GET, f'/users/{username}/repos'))
 
 def list_prs(owner, repo):
-    print_fields_sortby(snarfer(GET, '/repos/%s/%s/pulls' % (owner, repo)),
+    print_fields_sortby(snarfer(GET, f'/repos/{owner}/{repo}/pulls'),
             ['html_url', 'title'], 'number')
 
 def list_org(org):
-    print_fields(snarfer(GET, '/orgs/%s/repos' % org))
+    print_fields(snarfer(GET, f'/orgs/{org}/repos'))
 
 def list_branches(owner, repo):
-    print_refs(snarfer(GET, '/repos/%s/%s/branches' % (owner,repo)))
+    print_refs(snarfer(GET, f'/repos/{owner}/{repo}/branches'))
 
 def list_tags(owner, repo):
-    print_refs(snarfer(GET, '/repos/%s/%s/tags' % (owner,repo)))
+    print_refs(snarfer(GET, f'/repos/{owner}/{repo}/tags'))
 
 def list_git_refs(owner, repo):
-    print_git_refs(snarfer(GET, '/repos/%s/%s/git/refs' % (owner,repo)))
+    print_git_refs(snarfer(GET, f'/repos/{owner}/{repo}/git/refs'))
 
 def dump_user(username):
-    dump_infos(snarfer(GET, '/users/%s/repos' % username))
+    dump_infos(snarfer(GET, f'/users/{username}/repos'))
 
 def dump_org(org):
-    dump_infos(snarfer(GET, '/orgs/%s/repos' % org))
+    dump_infos(snarfer(GET, f'/orgs/{org}/repos'))
 
 def create_mine(repo):
     snarfer(POST, '/user/repos', {"name": repo})
 
 def create_org(org, repo):
-    snarfer(POST, '/orgs/%s/repos' % org, {"name": repo})
+    snarfer(POST, f'/orgs/{org}/repos', {"name": repo})
 
 def fork_mine(owner, repo):
-    snarfer(POST, '/repos/%s/%s/forks' % (owner,repo))
+    snarfer(POST, f'/repos/{owner}/{repo}/forks')
 
 def list_forks(owner, repo):
-    print_fields(snarfer(GET, '/repos/%s/%s/forks' % (owner, repo)))
+    print_fields(snarfer(GET, f'/repos/{owner}/{repo}/forks'))
 
 def delete_repo(owner, repo):
-    snarfer(DELETE, '/repos/%s/%s' % (owner,repo))
+    snarfer(DELETE, f'/repos/{owner}/{repo}')
 
 def rename_repo(owner, repo, newname):
-    snarfer(PATCH, '/repos/%s/%s' % (owner,repo), {"name": newname})
+    snarfer(PATCH, f'/repos/{owner}/{repo}', {"name": newname})
 
 def set_description(owner, repo, desc):
-    snarfer(PATCH, '/repos/%s/%s' % (owner,repo),
+    snarfer(PATCH, f'/repos/{owner}/{repo}',
            {"name": repo, "description": desc})
 
 def protect_branch(owner, repo, branch):
-    snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
-           { "protection": {
-               "enabled": True,
-               "required_status_checks": {
-                   "enforcement_level": "everyone",  # or "non_admins", or "off"
-                   "contexts": []  # eg, "continuous-integration/travis-ci"
-               }
-             }
-           })
+    data = {
+        "protection": {
+            "enabled": True,
+            "required_status_checks": {
+                "enforcement_level": "everyone",  # or "non_admins", or "off"
+                "contexts": []  # eg, "continuous-integration/travis-ci"
+            }
+        }
+    }
+    snarfer(PATCH, f'/repos/{owner}/{repo}/branches/{branch}', data)
 
 def unprotect_branch(owner, repo, branch):
-    snarfer(PATCH, '/repos/%s/%s/branches/%s' % (owner,repo,branch),
+    snarfer(PATCH, f'/repos/{owner}/{repo}/branches/{branch}',
            {"protection": {"enabled": False}})
 
 def merge_pr(owner, repo, number):
-    snarfer(PUT, "/repos/%s/%s/pulls/%s/merge" % (owner, repo, number))
+    snarfer(PUT, f"/repos/{owner}/{repo}/pulls/{number}/merge")
 
 def close_pr(owner, repo, number):
-    snarfer(PATCH, "/repos/%s/%s/pulls/%s" % (owner, repo, number),
+    snarfer(PATCH, f"/repos/{owner}/{repo}/pulls/{number}",
            {"state": "closed"})
 
 def request_pull_kw(owner, repo_base, head, **kw):
     repo, base = repo_base.split(':')
     data = dict(head=head, base=base, **kw)
-    print_fields([snarfer(POST, '/repos/%s/%s/pulls' % (owner,repo), data)])
+    print_fields([snarfer(POST, f'/repos/{owner}/{repo}/pulls', data)])
 
 def request_pull(owner, repo_base, head, title, body):
     request_pull_kw(owner, repo_base, head, title=title, body=body)
@@ -306,45 +317,45 @@ def request_pull_for_issue(owner, repo_base, head, issue):
     request_pull_kw(owner, repo_base, head, issue=int(issue))
 
 def list_hooks(owner, repo):
-    print_hook_info(snarfer(GET, '/repos/%s/%s/hooks' % (owner, repo)))
+    print_hook_info(snarfer(GET, f'/repos/{owner}/{repo}/hooks'))
 
 def ping_hook(owner, repo, hook_id):
-    snarfer(POST, "/repos/%s/%s/hooks/%s/pings" % (owner, repo, hook_id))
+    snarfer(POST, f"/repos/{owner}/{repo}/hooks/{hook_id}/pings")
 
 methods = {
-#   'command-name':     [method,   auth_required],
-    'list-mine':        [list_mine,        True],
-    'list-user':        [list_user,        False],
-    'list-org':         [list_org,         False],
-    'dump-user':        [dump_user,        False],
-    'dump-org':         [dump_org,         False],
-    'list-branches':    [list_branches,    False],
-    'list-tags':        [list_tags,        False],
-    'list-refs':        [list_git_refs,    False],
-    'create-mine':      [create_mine,      True],
-    'create-org':       [create_org,       True],
-    'fork-from':        [fork_mine,        True],
-    'list-forks':       [list_forks,       False],
-    'delete':           [delete_repo,      True],
-    'rename':           [rename_repo,      True],
-    'set-description':  [set_description,  True],
-    'protect-branch':   [protect_branch,   True],
-    'unprotect-branch': [unprotect_branch, True],
-    'request-pull':     [request_pull,     True],
-    'list-prs':         [list_prs,         False],
-    'merge-pr':         [merge_pr,         True],
-    'close-pr':         [close_pr,         True],
-    'list-hooks':       [list_hooks,       True],
-    'ping-hook':        [ping_hook,        True],
+#   'command-name':           [method,         auth_required],
+    'list-mine':              [list_mine,              True],
+    'list-user':              [list_user,              False],
+    'list-org':               [list_org,               False],
+    'dump-user':              [dump_user,              False],
+    'dump-org':               [dump_org,               False],
+    'list-branches':          [list_branches,          False],
+    'list-tags':              [list_tags,              False],
+    'list-refs':              [list_git_refs,          False],
+    'create-mine':            [create_mine,            True],
+    'create-org':             [create_org,             True],
+    'fork-from':              [fork_mine,              True],
+    'list-forks':             [list_forks,             False],
+    'delete':                 [delete_repo,            True],
+    'rename':                 [rename_repo,            True],
+    'set-description':        [set_description,        True],
+    'protect-branch':         [protect_branch,         True],
+    'unprotect-branch':       [unprotect_branch,       True],
+    'request-pull':           [request_pull,           True],
+    'list-prs':               [list_prs,               False],
+    'merge-pr':               [merge_pr,               True],
+    'close-pr':               [close_pr,               True],
+    'list-hooks':             [list_hooks,             True],
+    'ping-hook':              [ping_hook,              True],
     'request-pull-for-issue': [request_pull_for_issue, True],
 }
 
 def checkfields(f):
     if not f:
-        usage()
+        raise Usage()
     fields = f.split(':')
     if not all( re.search(r'^\w+$', x) for x in fields ):
-        usage()
+        raise Usage()
     return fields
 
 def method_argcount_ok(method, args):
@@ -352,11 +363,15 @@ def method_argcount_ok(method, args):
     def_args = len(method.__defaults__ or [])
     return cmd_args - def_args <= len(args) <= cmd_args
 
-def main(args):
-    ops, args = getopt.getopt(args, 'p:d:HF:')
+
+def parseargs(args):
+    try:
+        ops, args = getopt.getopt(args, 'p:d:HF:')
+    except getopt.GetoptError as e:
+        raise Usage(e)
     ops = dict(ops)
     if len(args) < 1:
-        usage()
+        raise Usage()
 
     pat    = None
     passfd = None
@@ -366,38 +381,50 @@ def main(args):
     if '-H' in ops: options.show_headers = True
     if '-F' in ops: options.listfields = checkfields(ops['-F'])
 
-    command = args[0]
-    args = args[1:]
+    options.token = getpw(pat, passfd)
 
+    return args[0], args[1:]
+
+
+def getmethod(command, args):
     if command not in methods:
-        usage("unrecognized command: '%s'" % command)
+        raise Usage("unrecognized command: '%s'" % command)
 
     method, auth_required = methods[command]
 
     if not method_argcount_ok(method, args):
-        usage("wrong number of args for %s command" % command)
+        raise Usage("wrong number of args for %s command" % command)
 
-    options.token = getpw(pat)
     if auth_required and not options.token:
-        usage("PASS required for %s command" % command)
+        raise Usage("PASS required for %s command" % command)
 
+    return method
+
+
+def main(args):
+    command, args = parseargs(args)
+    method = getmethod(command, args)
     method(*args)
 
+
 def dump_http_error(e):
-    print >>sys.stderr, e
-    print >>sys.stderr, ""
+    print(e, file=sys.stderr)
+    print("", file=sys.stderr)
     if options.show_headers:
-        print >>sys.stderr, e.headers
-        print >>sys.stderr, ""
+        print(e.headers, file=sys.stderr)
+        print("", file=sys.stderr)
     data = e.read()
     if e.headers.gettype() == 'application/json':
         data = json.loads(data) if data else None
-    print >>sys.stderr, json_pretty(data)
+    print(json_pretty(data), file=sys.stderr)
+
 
 if __name__ == '__main__':
     try:
         main(sys.argv[1:])
-    except urllib2.HTTPError as e:
+    except Usage as e:
+        usage(e)
+    except urllib.error.HTTPError as e:
         dump_http_error(e)
         sys.exit(1)
 
