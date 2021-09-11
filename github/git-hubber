@@ -148,7 +148,7 @@ def snarfergen(method, url, data=None):
     
 def snarfer(method, path, data=None):
     if data:
-        data = json.dumps(data)
+        data = json.dumps(data).encode('utf-8')
     url = apiurl + path
     outs = list(snarfergen(method, url, data))
     nresp = len(outs)
