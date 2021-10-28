@@ -11,7 +11,7 @@ import sys
 
 from optparse import OptionParser
 
-KOJI_WEB = "https://koji.chtc.wisc.edu"
+KOJI_WEB = "https://koji.opensciencegrid.org"
 
 def get_args(argv):
     usage = """\
@@ -100,29 +100,36 @@ def main(argv):
     tblformat, tags, packages = get_args(argv)
 
     old_lines = []
+    org_lines = []
     new_lines = []
     errors = []
 
     tag_package_table = [[tag, package] for tag in tags for package in packages]
 
     old_divider = ""
+    org_divider = "|---+---|"
     new_divider = "--- | ---"
     if tblformat == 'tag':
         tag_package_table.sort(key=lambda pair:pair[0])
         old_header = "|| Tag || Build ||"
         old_formatstr = "| %(tag)s | [%(latest_build)s|%(build_url)s] |"
+        org_header = "| *Tag* | *Build* |"
+        org_formatstr = "| %(tag)s | [[%(build_url)s][%(latest_build)s]] |"
         new_header = "**Tag** | **Build**"
         new_formatstr = " %(tag)s | [%(latest_build)s](%(build_url)s)"
     elif tblformat == 'build':
         tag_package_table.sort(key=lambda pair:pair[1])
         old_header = "|| Build || Tag ||"
         old_formatstr = "| [%(latest_build)s|%(build_url)s] | %(tag)s |"
+        org_header = "| *Build* | *Tag* |"
+        org_formatstr = "| [[%(build_url)s][%(latest_build)s]] | %(tag)s |"
         new_header = "**Build** | **Tag**"
         new_formatstr = " [%(latest_build)s](%(build_url)s) | %(tag)s"
     else:
         assert False, "shouldn't get here"
 
     old_lines, errors = build_table(tag_package_table, old_header, old_divider, old_formatstr)
+    org_lines, _ = build_table(tag_package_table, org_header, org_divider, org_formatstr)
     new_lines, _ = build_table(tag_package_table, new_header, new_divider, new_formatstr)
 
     ret = 0
@@ -133,6 +140,10 @@ def main(argv):
     if old_lines:
         print(" ************* Old JIRA syntax *************")
         print("\n".join(old_lines))
+        print("\n")
+    if org_lines:
+        print(" ************* org-mode syntax *************")
+        print("\n".join(org_lines))
         print("\n")
     if new_lines:
         print(" ************* New JIRA syntax *************")
