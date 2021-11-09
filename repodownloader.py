@@ -174,7 +174,7 @@ def main(argv):
         "--dirty",
         action="store_true",
         type=bool,
-        help="Clean the target directory before fetch and reset",
+        help="Do not clean the target directory before fetch and reset",
     )
     args = parser.parse_args(argv[1:])
 
