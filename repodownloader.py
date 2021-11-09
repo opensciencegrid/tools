@@ -83,7 +83,7 @@ def run_git_command(command, directory=None, git_directory=None):
     return True
 
 
-def git_clone_or_pull(repo, directory, branch):
+def git_clone_or_pull(repo, directory, branch, dirty):
     """Clone a git repository from `repo` into `directory`, or, if a git
     repository already exists, update to the latest changes from `origin`.
     Then, check out `branch`
@@ -109,7 +109,8 @@ def git_clone_or_pull(repo, directory, branch):
             directory,
             branch,
         )
-        _ = run_git_command(["clean", "-df"], directory=directory)
+        if not dirty:
+            _ = run_git_command(["clean", "-df"], directory=directory)
         ok = run_git_command(["fetch", "origin"], directory=directory)
         ok = ok and run_git_command(
             ["reset", "--hard", "origin/%s" % (branch)], directory=directory
@@ -169,6 +170,12 @@ def main(argv):
         default=argv[0],
         help="Subject to prefix notification email with; default: %(default)s",
     )
+    parser.add_argument(
+        "--dirty",
+        action="store_true",
+        type=bool,
+        help="Clean the target directory before fetch and reset",
+    )
     args = parser.parse_args(argv[1:])
 
     # Set up logging for email: log temporarily into a string and send it at the
@@ -191,7 +198,7 @@ def main(argv):
     log.setLevel(loglevel)
 
     try:
-        ret = 0 if git_clone_or_pull(args.repo, args.directory, args.branch) else 1
+        ret = 0 if git_clone_or_pull(args.repo, args.directory, args.branch, args.dirty) else 1
     except Exception as e:
         log.exception("Unhandled exception: %s", e)
         ret = 99
