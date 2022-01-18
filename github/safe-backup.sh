@@ -33,7 +33,7 @@ safebakrepo () {
 
     datelog "Fetching $remote"
     cd "$repo"
-    git fetch
+    timeout 240s --kill-after=20s git fetch
     safetags
     touch last-success-mtime
   )
