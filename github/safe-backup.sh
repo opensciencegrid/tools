@@ -22,7 +22,11 @@ safebakrepo () {
   ( # run in subshell that exits on errors
     set -e
     remote=${remote%/}
-    repo=${remote##*/}
+    if [[ $remote =~ ([^/]+/[^/]+)$ ]]; then
+      repo=${BASH_REMATCH[1]}
+    else
+      repo=${remote##*/}
+    fi
     [[ $repo = *.git ]] || repo+=.git
     if [[ -e $repo/NO_FETCH ]]; then
         datelog "Skipping $remote (NO_FETCH file present)"
@@ -43,7 +47,7 @@ safebakrepo () {
 initrepo () {
   (
     datelog "Initializing backup repo for $remote"
-    mkdir "$repo"
+    mkdir -p "$repo"
     cd "$repo"
     git init --bare
     git remote add origin "$remote"
