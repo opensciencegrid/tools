@@ -39,8 +39,8 @@ trap "rm -f $message_file" EXIT
     printf "$fmtstr" "Repo directory" "Last successful fetch" "NO_FETCH file"
     printf "$fmtstr" "--------------" "---------------------" "-------------"
 
-    for repo in ./*.git; do
-        repo_directory=`basename $repo`
+    for repo in ./*/*.git; do
+        repo_directory=${repo%./}
 
         if [ -f $repo/last-success-mtime ]; then
             last_successful_fetch=`pretty_mtime $repo/last-success-mtime`
