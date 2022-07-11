@@ -42,8 +42,8 @@ trap "rm -f $message_file" EXIT
     for repo in ./*/*.git; do
         repo_directory=${repo%./}
 
-        if [ -f $repo/last-success-mtime ]; then
-            last_successful_fetch=`pretty_mtime $repo/last-success-mtime`
+        if [[ -f $repo/last-success-mtime ]]; then
+            last_successful_fetch=`pretty_mtime "$repo/last-success-mtime"`
         else
             last_successful_fetch="UNKNOWN"
         fi
@@ -54,8 +54,8 @@ trap "rm -f $message_file" EXIT
         else
             no_fetch_file=''
 
-            if [ -f $repo/last-success-mtime ]; then
-                mtime=`stat --format %Y $repo/last-success-mtime`
+            if [[ -f $repo/last-success-mtime ]]; then
+                mtime=`stat --format %Y "$repo/last-success-mtime"`
                 if [ $min_timestamp -gt $mtime ]; then
                     min_timestamp=$mtime
                 elif [ $max_timestamp -lt $mtime ]; then
