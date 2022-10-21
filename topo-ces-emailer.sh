@@ -16,7 +16,6 @@ logdir=$HOME/ce_xml_logs
 FROM=osg-ce-diff@chtc.wisc.edu
 REPLYTO=edquist@cs.wisc.edu
 TO=(
-    lmichael@wisc.edu,
     jstathas@morgridge.org,
     blin@cs.wisc.edu,
     fkw888@gmail.com,
