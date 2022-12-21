@@ -7,6 +7,9 @@ srcdir=$topdir/script
 lockfile=/tmp/$(id -un)/.gitbackups.lk
 tsdir=/var/tmp/git-safe-backup
 
+# want new enough git for branch patterns like "preview-*"
+PATH=/unsup/git/bin:$PATH
+
 # list file of git clone urls, path can be absolute or relative to bakdir
 git_remotes_listfile=remotes.list
 
