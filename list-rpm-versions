@@ -127,7 +127,7 @@ def parse_nevra(item):
     return na,evr
 
 def get_nv_evr_list(items):
-    if re.search(r'[._]el8[._]', items[-1]):
+    if re.search(r'[._]el[89][._]', items[-1]):
         return map(parse_nevra, items)
     else:
         return group_adjacent(items, 2)
