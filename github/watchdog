@@ -9,7 +9,7 @@ rootdir=/p/condor/workspaces/vdt/git
 repodir=${rootdir}/repo
 
 email_from=`whoami`@cs.wisc.edu
-email_to="matyas+cron@cs.wisc.edu edquist@cs.wisc.edu tim@cs.wisc.edu blin@cs.wisc.edu cat@cs.wisc.edu bbockelman@morgridge.org"
+email_to="matyas+cron@cs.wisc.edu tim@cs.wisc.edu blin@cs.wisc.edu cat@cs.wisc.edu bbockelman@morgridge.org"
 
 subject_ok="Git[Hub] Safe-backup: all fetches OK"
 subject_bad="Git[Hub] Safe-backup: some fetches failed"
