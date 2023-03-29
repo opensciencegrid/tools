@@ -16,7 +16,7 @@ RETRIES = 10
 RETRY_WAIT = 60
 TIMEOUT = 60 * 60 * 18  # 18 hours
 NOTIFY_EMAILS = [
-    x + "@cs.wisc.edu" for x in ["blin", "cat", "edquist", "matyas+cron", "tim"]
+    x + "@cs.wisc.edu" for x in ["blin", "cat", "matyas+cron", "tim"]
 ]
 KEY = "/root/osg_backup_key"
 

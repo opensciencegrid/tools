@@ -14,14 +14,14 @@ datadir=$HOME/ce_xml_data
 logdir=$HOME/ce_xml_logs
 
 FROM=osg-ce-diff@chtc.wisc.edu
-REPLYTO=edquist@cs.wisc.edu
+REPLYTO=matyas@cs.wisc.edu
 TO=(
     jstathas@morgridge.org,
     blin@cs.wisc.edu,
     fkw888@gmail.com,
     cat@cs.wisc.edu,
     jdost@ucsd.edu,
-    edquist@cs.wisc.edu
+    matyas@cs.wisc.edu
 )
 
 [[ -d $datadir ]] || mkdir "$datadir"
