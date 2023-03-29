@@ -21,7 +21,7 @@ TO=(
     fkw888@gmail.com,
     cat@cs.wisc.edu,
     jdost@ucsd.edu,
-    matyas@cs.wisc.edu
+    matyas+cron@cs.wisc.edu
 )
 
 [[ -d $datadir ]] || mkdir "$datadir"
