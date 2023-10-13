@@ -5,8 +5,8 @@ tools=/p/condor/workspaces/vdt/tools
 export PATH+=:/p/condor/workspaces/vdt/osg-build
 
 FROM=cndrutil@cs.wisc.edu
-REPLYTO=technology-team@opensciencegrid.org
-TO=technology-team@opensciencegrid.org
+REPLYTO=technology-team@osg-htc.org
+TO=technology-team@osg-htc.org
 
 check_for_el () {
   EL=$1
