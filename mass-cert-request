@@ -1,0 +1,101 @@
+#!/bin/bash
+__SUMMARY__=$(cat <<"__TLDR__"
+mass-cert-request
+
+Goes through all the .req and .csr files in the given directory, copies their
+SANs and their CSRs to the X clipboard and moves them to a "done" directory.
+Requires xclip (and X) to copy stuff to the X clipboard.
+__TLDR__
+)
+
+Prog=${0##*/}
+
+eecho () {
+    echo >&2 "$@"
+}
+
+fail () {
+    set +o nounset
+    ret=${1:-1}
+    shift &>/dev/null || :
+    if [[ -z $* ]]; then
+        echo "$Prog: unspecified failure, exiting" >&2
+    else
+        echo "$Prog:" "$@" >&2
+    fi
+    exit "$ret"
+}
+
+usage () {
+    echo >&2 "$__SUMMARY__"
+    echo >&2
+    echo >&2 "Usage: $Prog [<req_directory>] [<done_directory>]"
+    echo >&2
+    echo >&2 "The default req_directory is '.' and the default done_directory is 'done'"
+    echo >&2 "done_directory is relative to req_directory"
+    exit "$1"
+}
+
+require_program () {
+    command -v "$1" &>/dev/null ||
+        fail 127 "Required program '$1' not found in PATH"
+}
+
+ask_yn () {
+    eecho "$@"
+    while read -r; do
+        case $REPLY in
+            [Yy]*) return 0;;
+            [Nn]*) return 1;;
+            *) eecho "Enter yes or no";;
+        esac
+    done
+    return 2  # EOF
+}
+
+if [[ $* == -h || $* == --help ]]; then
+    usage 0
+fi
+
+set -o nounset
+unset GREP_OPTIONS POSIXLY_CORRECT
+
+
+Reqdir=${1:-.}
+Donedir=${2:-done}
+
+
+require_program xclip
+require_program openssl
+
+
+cd "$Reqdir" || fail 3 "Could not enter req_directory $Reqdir"
+[[ $DISPLAY ]] || fail 4 '$DISPLAY is not set or empty'
+mkdir -p "$Donedir" || fail 5 "Could not create done_directory $Donedir"
+
+eecho "Certificate Request Webform: https://servercertificates.wisc.edu/#!/make-requests"
+eecho
+for it in *.req *.csr; do
+    # TODO skip if not a valid CSR
+    eecho "*** $it ***"
+    < "$it" tee /dev/stderr | xclip -i -selection clipboard
+    eecho "CSR copied to clipboard"
+    eecho ""
+    eecho ""
+    eecho "Press enter to print and copy SANs"
+    read -r
+    openssl req -in "$it" -noout -text | grep 'DNS:' | sed 's/DNS://g' | tr ',' $'\n' | sed 's/^ *//' | tee /dev/stderr | xclip -i -selection clipboard
+    eecho
+    eecho "SANs copied to clipboard"
+    eecho
+    if ask_yn "Have you successfully requested the cert? (y/n)"; then
+        mv "$it" "$Donedir"/ || fail 6 "Could not move $it to $Donedir"
+    else
+        fail 1 "Stopping at user request"
+    fi
+    eecho
+done
+
+
+
+# vim:et:sw=4:sts=4:ts=8
