@@ -1,8 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # retrieve sha for remote refname -- a wrapper around git-ls-remote
 
-from __future__ import print_function
 import subprocess
 import sys
 import os
@@ -12,7 +11,7 @@ def group_adjacent(seq, n):
     return zip(*([iter(seq)] * n))
 
 def get_remote_refmap(remote):
-    output = subprocess.check_output(['git', 'ls-remote', remote])
+    output = subprocess.check_output(['git', 'ls-remote', remote]).decode()
     return dict( (ref,sha) for sha,ref in group_adjacent(output.split(), 2) )
 
 def lookup_ref(refmap, ref):
