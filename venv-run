@@ -12,5 +12,11 @@ usage () {
 
 . "$1"/bin/activate
 shift
-python "$@"
+# unversioned 'python' may be missing
+if python -c 'import sys;sys.exit(0)' &>/dev/null; then
+    python=python
+else
+    python=python3
+fi
+$python "$@"
 
