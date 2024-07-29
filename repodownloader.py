@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Update a repo stored in DIRECTORY with the "origin" upstream at REPO to
@@ -7,24 +7,20 @@ the latest, and check out the given BRANCH.
 If DIRECTORY does not exist, REPO is cloned instead.
 
 """
-from __future__ import print_function
+
 from argparse import ArgumentParser
 from email.mime.text import MIMEText
 import logging
 import logging.handlers
-import pipes
 import pwd
 import os
-import six
+import shlex
 import smtplib
 import socket
 import subprocess
 import sys
 
-if six.PY2:
-    from StringIO import StringIO
-else:
-    from io import StringIO
+from io import StringIO
 
 
 log = logging.getLogger(__name__)
@@ -71,10 +67,10 @@ def run_git_command(command, directory=None, git_directory=None):
     git_proc = subprocess.Popen(
         full_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
-    out = git_proc.communicate()[0].strip()
+    out = git_proc.communicate()[0].decode().strip()
     outstr = "output:\n%s\n\n" % out if out else "no output\n"
 
-    command_str = " ".join(pipes.quote(x) for x in full_command)
+    command_str = " ".join(shlex.quote(x) for x in full_command)
     if git_proc.returncode != 0:
         log.error("%s... FAILED  %s", command_str, outstr)
         return False
