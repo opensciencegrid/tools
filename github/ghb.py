@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # back up json for a github org's issues/comments/releases
 
@@ -40,18 +40,18 @@ def dump_obj(obj):
     mkdir_p(os.path.dirname(relpath))
     jsonpath = relpath + '.json'
     if os.path.exists(jsonpath):
-        if json.load(open(jsonpath)) == obj._rawData:
-            print "skipping already-up-to-date %s" % jsonpath
+        if json.load(open(jsonpath, "rt")) == obj._rawData:
+            print("skipping already-up-to-date %s" % jsonpath)
             return
-    print "writing %s" % jsonpath
+    print("writing %s" % jsonpath)
     json_data = to_json(obj._rawData)  # .raw_data triggers reload
-    print >>open(jsonpath, "w"), json_data
+    print(json_data, file=open(jsonpath, "wt"))
     return True
 
 def dump_org_repos(org):
     repos = sorted(org.get_repos(), key=operator.attrgetter('name'))
     for i,repo in enumerate(repos):
-        print "(%s/%s) [%s]" % (i+1, len(repos), repo.name)
+        print("(%s/%s) [%s]" % (i+1, len(repos), repo.name))
         dump_repo(repo)
 
 def dump_repo(repo):
@@ -74,7 +74,7 @@ def dump_updated_obj_items(obj, gettername, nest=None, **igkw):
     return dump_items(items, updated_at_path, nest, want_since)
 
 def dump_items(items, updated_at_path=None, nest=None, want_since=False):
-    updated_items = filter(dump_obj, items)
+    updated_items = list(filter(dump_obj, items))
     if nest:
         for item in updated_items:
             dump_updated_obj_items(item, nest)
@@ -82,20 +82,20 @@ def dump_items(items, updated_at_path=None, nest=None, want_since=False):
                        (items and not os.path.exists(updated_at_path))):
         if hasattr(items[0], 'updated_at'):
             last_update = max( i.updated_at for i in items )
-            print "writing %s" % updated_at_path
-            print >>open(updated_at_path, 'w'), datetime_to_raw(last_update)
+            print("writing %s" % updated_at_path)
+            print(datetime_to_raw(last_update), file=open(updated_at_path, 'wt'))
     elif updated_at_path:
-        print "no new items for %s" % updated_at_path.replace('.ts', '')
+        print("no new items for %s" % updated_at_path.replace('.ts', ''))
     return updated_items
 
 def accepts_since(f):
-    c = f.func_code
+    c = f.__code__
     argnames = c.co_varnames[:c.co_argcount]
     return 'since' in argnames
 
 def get_since_kw(path, itemgetter, want_since):
     if want_since and os.path.exists(path):
-        last = raw_to_datetime(open(path).read().rstrip())
+        last = raw_to_datetime(open(path, "rt").read().rstrip())
         since = last + datetime.timedelta(0, 1)
         return {'since': since}
     else:
@@ -104,14 +104,14 @@ def get_since_kw(path, itemgetter, want_since):
 def main(argv):
     if len(argv) == 2 and os.path.exists(argv[1]):
         org = argv[0]
-        user_token = [ l.rstrip() for l in open(argv[1]) ]
+        user_token = [ l.rstrip() for l in open(argv[1], "rt") ]
         g = github.Github(*user_token, timeout=60)
-        print "rate_limiting api queries remaining: %s/%s" % g.rate_limiting
-        print "---"
+        print("rate_limiting api queries remaining: %s/%s" % g.rate_limiting)
+        print("---")
         o = g.get_organization(org)
         dump_org_repos(o)
     else:
-        print "usage: %s ORG USER_TOKEN_FILE" % os.path.basename(__file__)
+        print("usage: %s ORG USER_TOKEN_FILE" % os.path.basename(__file__))
 
 if __name__ == '__main__':
     main(sys.argv[1:])
