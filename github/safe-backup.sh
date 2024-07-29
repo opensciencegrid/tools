@@ -148,5 +148,7 @@ else
     touch $tsdir/last-success-mtime
 fi
 
-/usr/sbin/logrotate --state $logdir/.logrotate.state $srcdir/backups.logrotate
+# copy logrotate config to local disk because logrotate tries to lock it
+cp $srcdir/backups.logrotate $tmpd/backups.logrotate
+/usr/sbin/logrotate --state $logdir/.logrotate.state $tmpd/backups.logrotate
 
