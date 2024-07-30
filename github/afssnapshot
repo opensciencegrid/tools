@@ -4,6 +4,8 @@
 # creates a consistent copy of each repo, which can then be safely backed
 # up by AFS backups.
 
+# XXX This broke when we moved from the "repo/$REPO" layout to the "repo/$ORGANIZATION/$REPO" layout
+
 
 rootdir=/p/condor/workspaces/vdt/git
 repodir=${rootdir}/repo
