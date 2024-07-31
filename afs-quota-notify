@@ -110,7 +110,7 @@ def get_disk_usage_percent(directory):
 
 def read_config(config_fp):
     config = configparser.ConfigParser()
-    config.readfp(config_fp)
+    config.read_file(config_fp)
 
     directories = re.split(r'[ ,\n]+', config.get(SECTION, 'directories'))
     email = re.split(r'[ ,\n]+', config.get(SECTION, 'email'))
@@ -134,7 +134,7 @@ def main(argv):
         filename = os.path.realpath(args[0])
         if filename.startswith("/afs/cs.wisc.edu"):
             filename = filename[16:]
-        config_fp = open(filename, 'r')
+        config_fp = open(filename, 'rt')
         config_text = "Using config at " + filename
     else:
         config_fp = StringIO(DEFAULT_CONFIG)
