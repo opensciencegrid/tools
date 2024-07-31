@@ -109,7 +109,7 @@ def get_disk_usage_percent(directory):
 
 
 def read_config(config_fp):
-    config = configparser.SafeConfigParser()
+    config = configparser.ConfigParser()
     config.readfp(config_fp)
 
     directories = re.split(r'[ ,\n]+', config.get(SECTION, 'directories'))
