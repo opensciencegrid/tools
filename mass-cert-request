@@ -53,6 +53,15 @@ ask_yn () {
     return 2  # EOF
 }
 
+get_hostname_and_SANs () {
+    local csr="${1?Need CSR}"
+    openssl req -in "$csr" -noout -text |
+        grep 'DNS:' |
+        sed 's/DNS://g' |
+        tr ',' $'\n' |
+        sed 's/^ *//'
+}
+
 if [[ $* == -h || $* == --help ]]; then
     usage 0
 fi
@@ -75,6 +84,7 @@ mkdir -p "$Donedir" || fail 5 "Could not create done_directory $Donedir"
 
 eecho "Certificate Request Webform: https://servercertificates.wisc.edu/#!/make-requests"
 eecho
+shopt -s nullglob
 for it in *.req *.csr; do
     # TODO skip if not a valid CSR
     eecho "*** $it ***"
@@ -84,7 +94,8 @@ for it in *.req *.csr; do
     eecho ""
     eecho "Press enter to print and copy SANs"
     read -r
-    openssl req -in "$it" -noout -text | grep 'DNS:' | sed 's/DNS://g' | tr ',' $'\n' | sed 's/^ *//' | tee /dev/stderr | xclip -i -selection clipboard
+    get_hostname_and_SANs "$it" |
+        tee /dev/stderr | xclip -i -selection clipboard
     eecho
     eecho "SANs copied to clipboard"
     eecho
