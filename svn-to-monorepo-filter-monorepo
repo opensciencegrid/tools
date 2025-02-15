@@ -1,0 +1,53 @@
+#!/bin/bash
+
+#
+# A helper script for svn-to-monorepo; runs "git filter-repo" to rearrange the monorepo.
+# You will probably not run this by hand, unless you're experimenting.
+#
+
+force=
+if [[ $1 == --force ]]; then
+    force=--force
+    shift
+fi
+
+
+git_dir=${1?Need git dir}
+shift
+if [[ $1 == --force ]]; then  # ugh
+    force=--force
+    shift
+fi
+git -C "${git_dir}" filter-repo --invert-paths \
+    --path-glob '**/*.tar.xz' \
+    --path-glob '**/*.tar.gz' \
+    --path-glob '**/*.tar.bz2' \
+    --path-glob '**/*.src.rpm' \
+    --path-glob '**/_*' \
+    --path-glob 'tags/' \
+    $force
+
+
+args=()
+args+=(--path-rename branches/23-contrib:23-contrib)
+args+=(--path-rename branches/23-empty:23-empty)
+args+=(--path-rename branches/23-internal:23-internal)
+args+=(--path-rename branches/23-main:23-main)
+args+=(--path-rename branches/23-upcoming:23-upcoming)
+args+=(--path-rename branches/24-contrib:24-contrib)
+args+=(--path-rename branches/24-empty:24-empty)
+args+=(--path-rename branches/24-internal:24-internal)
+args+=(--path-rename branches/24-main:24-main)
+args+=(--path-rename branches/24-upcoming:24-upcoming)
+args+=(--path-rename branches/3.6-upcoming:3.6-upcoming)
+args+=(--path-rename branches/devops:devops)
+args+=(--path-rename branches/dist-el7-build:dist-el7-build)
+args+=(--path-rename branches/dist-el8-build:dist-el8-build)
+args+=(--path-rename branches/dist-el9-build:dist-el9-build)
+args+=(--path-rename branches/osg-3.6:osg-3.6)
+args+=(--path-rename branches/osg-3.6-contrib:osg-3.6-contrib)
+args+=(--path-rename branches/osg-internal:osg-internal)
+git -C "${git_dir}" filter-repo "${args[@]}" $force  &&  git -C "${git_dir}" clean -df
+
+
+# vim:et:sw=4:sts=4:ts=8
