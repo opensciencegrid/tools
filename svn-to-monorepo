@@ -124,16 +124,22 @@ GIT svn fetch -q --log-window=1000  ||  fail 7 "Fetch failed"
 # Configure the remote; this also fetches
 #
 GIT remote add -f github https://github.com/${GITHUB_REPOSITORY}  ||  fail 9 "Adding GitHub as a remote failed"
+GIT branch --set-upstream-to=github/main
 
 #
-# Done!
+# Done!  Push if we can do it without rewriting history.
 #
 eecho "*"
 eecho "* Repo conversion complete"
 eecho "*"
-eecho "Run the following to push:"
-eecho "cd \"$DESTDIR\""
-eecho "git push github main"
+
+if GIT merge-base --is-ancestor github/main main
+then
+    eecho "* Fast forward, pushing"
+    GIT push github main  ||  fail 10 "Failed to push"
+else
+    eecho "* New conversion is not a fast forward; please investigate"
+fi
 
 
 # vim:et:sw=4:sts=4:ts=8
