@@ -83,7 +83,7 @@ set -o nounset
 #
 
 require_program git
-git svn -h >/dev/null || fail 127 "git svn not available"
+git svn -h >/dev/null || fail 127 "git svn not available; try installing the git-svn package (or equivalent on your distribution)"
 require_program curl
 require_program git-filter-repo
 [[ -x $FILTER_SCRIPT ]] || fail 127 "$FILTER_SCRIPT not found or not executable"
