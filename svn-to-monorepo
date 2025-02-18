@@ -135,8 +135,15 @@ eecho "*"
 
 if GIT merge-base --is-ancestor github/main main
 then
-    eecho "* Fast forward, pushing"
-    GIT push github main  ||  fail 10 "Failed to push"
+    eecho "* Resulting repo is a fast-forward"
+    if ask_yn "Push to GitHub?"; then
+        eecho "* Pushing"
+        GIT push github main  ||  fail 10 "Failed to push"
+        eecho "* Done"
+    else
+        eecho "* Not pushing, as requested. Done."
+        exit 0
+    fi
 else
     eecho "* New conversion is not a fast forward; please investigate"
 fi
