@@ -1,0 +1,152 @@
+#!/bin/bash
+__SUMMARY__=$(cat <<"__TLDR__"
+svn-to-monorepo
+
+Converts the VDT SVN repo to a Git repo with a 'monorepo' layout --
+meaning all of the branches are in a directory, instead of there being
+one Git branch per SVN branch.
+__TLDR__
+)
+
+AUTHORS_FILE=.svn-authors.txt
+AUTHORS_URL=https://vdt.cs.wisc.edu/svn-authors.txt
+GITHUB_REPOSITORY=osg-htc/software-packaging
+SVN=https://vdt.cs.wisc.edu/svn
+
+PROG=${0##*/}
+PROGDIR=$(dirname "$0")
+
+FILTER_SCRIPT=$PROGDIR/svn-to-monorepo-filter-monorepo
+
+ask_yn () {
+    echo >&2 "$@"
+    while read -r; do
+        case $REPLY in
+            [Yy]*) return 0;;
+            [Nn]*) return 1;;
+            *) echo >&2 "Enter yes or no";;
+        esac
+    done
+    return 2  # EOF
+}
+
+eecho () {
+    echo >&2 "$@"
+}
+
+fail () {
+    set +exu
+    ret=${1:-1}
+    shift &>/dev/null || :
+    if [[ -z $* ]]; then
+        echo "$PROG: unspecified failure, exiting" >&2
+    else
+        echo "$PROG:" "$@" >&2
+    fi
+    exit "$ret"
+}
+
+usage () {
+    echo >&2 "$__SUMMARY__"
+    echo >&2
+    echo >&2 "Usage: $PROG <destination>"
+    exit "$1"
+}
+
+require_program () {
+    command -v "$1" &>/dev/null ||
+        fail 127 "Required program '$1' not found in PATH"
+}
+
+GIT () {
+    git -C "$DESTDIR" "$@"
+}
+
+
+#
+# Parse args
+#
+
+if [[ $1 == -h || $1 == --help ]]; then
+    usage 0
+fi
+if [[ $# != 1 ]]; then
+    usage 2
+fi
+DESTDIR=$(readlink -f "$1")
+
+
+set -o nounset
+
+#
+# Check for required programs
+#
+
+require_program git
+git svn -h >/dev/null || fail 127 "git svn not available; try installing the git-svn package (or equivalent on your distribution)"
+require_program curl
+require_program git-filter-repo
+[[ -x $FILTER_SCRIPT ]] || fail 127 "$FILTER_SCRIPT not found or not executable"
+
+#
+# Create a fresh dir for the Git repo
+#
+if [[ -d $DESTDIR ]]; then
+    if ask_yn "$DESTDIR already exists. Delete it?"; then
+        rm -rf "$DESTDIR" || fail 4 "Unable to delete $DESTDIR"
+    else
+        fail 4 "Not deleting $DESTDIR"
+    fi
+fi
+mkdir "$DESTDIR" || fail 5 "Could not create $DESTDIR"
+
+#
+# Init the repo
+#
+
+
+GIT svn init $SVN/native/redhat --ignore-paths='^(tags)|(/_[a-z_]+/|[.]tar[.]gz$|[.]rpm$)'  || fail 6 "Error creating Git repo"
+curl -o "$DESTDIR/.git/$AUTHORS_FILE" "$AUTHORS_URL" || fail 7 "Could not download authors file"
+GIT config svn.authorsfile ".git/$AUTHORS_FILE"
+
+#
+# Fetch from SVN and filter the results
+#
+
+eecho "*"
+eecho "* Fetching SVN commits, go make a sandwich"
+eecho "*"
+GIT svn fetch -q --log-window=1000  ||  fail 7 "Fetch failed"
+# Filter needs to be forced because this is not a freshly cloned repo
+"$FILTER_SCRIPT" --force "$DESTDIR"  ||  fail 8 "Filter failed"
+
+#
+# Configure the remote; this also fetches
+#
+GIT remote add -f github https://github.com/${GITHUB_REPOSITORY}  ||  fail 9 "Adding GitHub as a remote failed"
+GIT branch --set-upstream-to=github/main
+
+#
+# Done!  Push if we can do it without rewriting history.
+#
+eecho "*"
+eecho "* Repo conversion complete"
+eecho "*"
+
+if GIT merge-base --is-ancestor github/main main
+then
+    eecho "* Resulting repo is a fast-forward"
+    if ask_yn "Push to GitHub?"; then
+        eecho "* Pushing"
+        GIT push github main  ||  fail 10 "Failed to push"
+        eecho "* Done"
+    else
+        eecho "* Not pushing, as requested. Done."
+        exit 0
+    fi
+else
+    eecho "* New conversion is not a fast forward; please investigate"
+fi
+
+
+# vim:et:sw=4:sts=4:ts=8
