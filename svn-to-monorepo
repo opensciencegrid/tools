@@ -62,6 +62,10 @@ GIT () {
     git -C "$DESTDIR" "$@"
 }
 
+GIT_RAW () {
+    git -C "$DESTDIR_RAW" "$@"
+}
+
 
 #
 # Parse args
@@ -74,6 +78,7 @@ if [[ $# != 1 ]]; then
     usage 2
 fi
 DESTDIR=$(readlink -f "$1")
+DESTDIR_RAW=${DESTDIR}.raw
 
 
 set -o nounset
@@ -104,21 +109,39 @@ mkdir "$DESTDIR" || fail 5 "Could not create $DESTDIR"
 # Init the repo
 #
 
+if [[ ! -e $DESTDIR_RAW/.git/svn ]]; then
+    if [[ -e $DESTDIR_RAW ]]; then
+        if ask_yn "$DESTDIR_RAW already exists but does not look like a git-svn repo. Delete it?"; then
+            rm -rf "$DESTDIR_RAW" || fail 4 "Unable to delete $DESTDIR_RAW"
+        else
+            fail 4 "Not deleting $DESTDIR_RAW"
+        fi
+    fi
+    mkdir "$DESTDIR_RAW" || fail 5 "Could not create $DESTDIR_RAW"
+    GIT_RAW svn init $SVN/native/redhat --ignore-paths='^(tags)|(/_[a-z_]+/|[.]tar[.]gz$|[.]rpm$)'  || fail 6 "Error creating Git repo"
+    curl -o "$DESTDIR_RAW/.git/$AUTHORS_FILE" "$AUTHORS_URL" || fail 7 "Could not download authors file"
+    GIT_RAW config svn.authorsfile ".git/$AUTHORS_FILE"
 
-GIT svn init $SVN/native/redhat --ignore-paths='^(tags)|(/_[a-z_]+/|[.]tar[.]gz$|[.]rpm$)'  || fail 6 "Error creating Git repo"
-curl -o "$DESTDIR/.git/$AUTHORS_FILE" "$AUTHORS_URL" || fail 7 "Could not download authors file"
-GIT config svn.authorsfile ".git/$AUTHORS_FILE"
+    #
+    # Fetch from SVN and filter the results
+    #
 
-#
-# Fetch from SVN and filter the results
-#
+    eecho "*"
+    eecho "* Fetching SVN commits for the first time, go make a sandwich"
+    eecho "*"
+    GIT_RAW svn fetch -q --log-window=1000  ||  fail 7 "Fetch failed"
+else
+    eecho "*"
+    eecho "* Updating SVN commits"
+    eecho "*"
+    GIT_RAW svn rebase  ||  fail 7 "Rebase failed"
+fi
 
 eecho "*"
-eecho "* Fetching SVN commits, go make a sandwich"
+eecho "* Cloning and filtering"
 eecho "*"
-GIT svn fetch -q --log-window=1000  ||  fail 7 "Fetch failed"
-# Filter needs to be forced because this is not a freshly cloned repo
-"$FILTER_SCRIPT" --force "$DESTDIR"  ||  fail 8 "Filter failed"
+git clone --no-local "$DESTDIR_RAW" "$DESTDIR" || fail 11 "clone from $DESTDIR_RAW to $DESTDIR failed"
+"$FILTER_SCRIPT" "$DESTDIR"  ||  fail 8 "Filter failed"
 
 #
 # Configure the remote; this also fetches
