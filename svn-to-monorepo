@@ -141,6 +141,7 @@ eecho "*"
 eecho "* Cloning and filtering"
 eecho "*"
 git clone --no-local "$DESTDIR_RAW" "$DESTDIR" || fail 11 "clone from $DESTDIR_RAW to $DESTDIR failed"
+git remote rm origin  # avoid warning from git filter-repo
 "$FILTER_SCRIPT" "$DESTDIR"  ||  fail 8 "Filter failed"
 
 #
