@@ -1,0 +1,8 @@
+.rand
+certs/
+private/
+index.txt
+serial
+*.old
+index.txt.attr
+newcerts/

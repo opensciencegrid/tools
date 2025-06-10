@@ -1,0 +1,51 @@
+#!/bin/bash
+# checkmodulus
+#
+# Usage: checkmodulus <file1> <file2>
+#
+# Compares the modulus of two X.509 files (cert, key, or CSR)
+# Returns 0 if they match, 1 if they do not, or something else on error
+
+fail () {
+    ret=$1
+    shift
+    echo >&2 "$*"
+    exit $ret
+}
+
+
+if [[ $# -ne 2 ]]; then
+    echo >&2 "Usage: ${0##*/} <certfile1|keyfile1|csrfile1> <certfile2|keyfile2|csrfile2>"
+    exit 2
+fi
+
+
+[[ -f $1 && -r $1 ]] || fail 3 "$1 not found or not a readable file"
+[[ -f $2 && -r $2 ]] || fail 3 "$2 not found or not a readable file"
+
+subcommand_for_file () {
+    local filetype ret filename
+    filename=$1
+    filetype=$(head -n 1 "$filename" | grep -Eo "CERTIFICATE-|REQUEST-|KEY-")
+    ret=$?
+    if [[ -z $filetype || $ret != 0 ]]; then
+        fail 3 "Unable to get file type of $filename"
+    fi
+    case $filetype in
+        CERTIFICATE-) echo x509; return 0;;
+        KEY-) echo rsa; return 0;;
+        REQUEST-) echo req; return 0;;
+        *) fail 99 "file type for $filename is $filetype - this should not have happened";;
+    esac
+}
+
+modulus1=$(openssl $(subcommand_for_file "$1") -noout -modulus -in "$1")
+modulus2=$(openssl $(subcommand_for_file "$2") -noout -modulus -in "$2")
+
+if [[ $modulus1 != $modulus2 ]]; then
+    echo 'files do not match'
+    exit 1
+else
+    echo 'ok'
+    exit 0
+fi
