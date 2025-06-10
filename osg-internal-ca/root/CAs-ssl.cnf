@@ -38,7 +38,7 @@ default_keyfile         = privkey.pem
 default_md              = sha256
 distinguished_name      = req_distinguished_name
 attributes              = req_attributes
-x509_extensions         = v3_ca # The extentions to add to the self signed cert
+x509_extensions         = v3_ca # The extensions to add to the self-signed certificate
 string_mask             = MASK:0x2002
 
 [req_distinguished_name]
