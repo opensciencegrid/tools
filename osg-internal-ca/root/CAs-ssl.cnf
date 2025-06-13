@@ -18,7 +18,7 @@ crl                     = $dir/crl.pem
 x509_extensions         = usr_cert
 name_opt                = ca_default
 cert_opt                = ca_default
-default_days            = 15000
+default_days            = 10000
 default_crl_days        = 30
 default_md              = sha256
 #preserve                = no
@@ -57,7 +57,7 @@ organizationalUnitName_default  = OSG Internal CAs
 commonName                      = Name of CA
 commonName_max                  = 64
 emailAddress                    = emailAddress
-emailAddress_default            = osg-bot@cs.wisc.edu
+#emailAddress_default            = osg-bot@cs.wisc.edu
 emailAddress_max                = 64
 
 [req_attributes]

@@ -18,7 +18,7 @@ crl                     = $dir/crl.pem
 x509_extensions         = usr_cert
 name_opt                = ca_default
 cert_opt                = ca_default
-default_days            = 3650
+default_days            = 10000
 default_crl_days        = 30
 default_md              = sha256
 preserve                = no
@@ -56,7 +56,7 @@ organizationalUnitName          = Koji service (or just "Koji")
 organizationalUnitName_default  = Koji
 commonName                      = Host Name
 commonName_max                  = 64
-emailAddress                    = osg-bot@cs.wisc.edu
+#emailAddress                    = osg-bot@cs.wisc.edu
 emailAddress_max                = 64
 
 [req_attributes]
