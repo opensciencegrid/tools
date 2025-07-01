@@ -97,13 +97,14 @@ require_program git-filter-repo
 # Create a fresh dir for the Git repo
 #
 if [[ -d $DESTDIR ]]; then
-    if ask_yn "$DESTDIR already exists. Delete it?"; then
-        rm -rf "$DESTDIR" || fail 4 "Unable to delete $DESTDIR"
+    if ask_yn "$DESTDIR already exists. Clear its contents?"; then
+        rm -rf "${DESTDIR}/"* "${DESTDIR}/".??* || fail 4 "Unable to delete contents of $DESTDIR"
     else
-        fail 4 "Not deleting $DESTDIR"
+        fail 4 "Not clearing $DESTDIR"
     fi
+else
+    mkdir "$DESTDIR" || fail 5 "Could not create $DESTDIR"
 fi
-mkdir "$DESTDIR" || fail 5 "Could not create $DESTDIR"
 
 #
 # Init the repo
