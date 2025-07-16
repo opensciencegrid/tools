@@ -97,10 +97,11 @@ require_program git-filter-repo
 # Create a fresh dir for the Git repo
 #
 if [[ -d $DESTDIR ]]; then
-    if ask_yn "$DESTDIR already exists. Clear its contents?"; then
-        rm -rf "${DESTDIR}/"* "${DESTDIR}/".??* || fail 4 "Unable to delete contents of $DESTDIR"
+    if ask_yn "$DESTDIR already exists. Replace it?"; then
+        rm -rf "${DESTDIR}.bak" || fail 4 "Unable to delete ${DESTDIR}.bak"
+        mv  -f "${DESTDIR}" "${DESTDIR}.bak" || fail 4 "Unable to move ${DESTDIR} out of the way"
     else
-        fail 4 "Not clearing $DESTDIR"
+        fail 4 "Not replacing $DESTDIR"
     fi
 else
     mkdir "$DESTDIR" || fail 5 "Could not create $DESTDIR"
@@ -145,9 +146,10 @@ git clone --no-local "$DESTDIR_RAW" "$DESTDIR" || fail 11 "clone from $DESTDIR_R
 "$FILTER_SCRIPT" "$DESTDIR"  ||  fail 8 "Filter failed"
 
 #
-# Configure the remote; this also fetches
+# Configure the remote and fetch from it
 #
-GIT remote add -f github https://github.com/${GITHUB_REPOSITORY}  ||  fail 9 "Adding GitHub as a remote failed"
+GIT remote add github https://github.com/${GITHUB_REPOSITORY}  ||  fail 9 "Adding GitHub as a remote failed"
+timeout 180 git -C "$DESTDIR" fetch github  ||  fail 11 "Fetch from GitHub failed"
 GIT branch --set-upstream-to=github/main
 
 #
