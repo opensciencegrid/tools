@@ -1,0 +1,206 @@
+#!/bin/bash
+# Neil Van Lysel
+# van-lyse@cs.wisc.edu
+# 10/8/2013
+#
+# This script creates kvm image files from tdl definitions using oz and libvirt.
+# There is one optional command line argument: the name of the vm you want created.
+#
+# This script must be ran as root
+# Raw image files need to end with .dsk
+# Tdl files need to end with .tdl
+
+# Space-separated list of directories where successfully created images are copied to.
+EXPORT_DIRECTORIES="$1"
+
+# Directory where tdl files are stored.
+TDL_DIRECTORY="/export/kvm/tdl"
+
+# Directory where .ks (or .auto) files are stored
+KS_DIRECTORY="/export/kvm/kickstart"
+
+# Directory where libvirt images are stored.
+LIBVIRT_IMAGE_DIRECTORY="/var/lib/libvirt/images"
+
+# Directory where backup images are stored.
+BACKUP_IMAGE_DIRECTORY="/export/kvm/backup"
+
+# Directory where oz log files are stored.
+LOG_DIR="/var/log/osg-base-images"
+
+# Comma-separated list of email address that will be notified if image creation fails.
+#ADMIN_EMAIL_LIST="chtc-admin@cs.wisc.edu,elenters@morgridge.org,blin@cs.wisc.edu,cat@cs.wisc.edu"
+ADMIN_EMAIL_LIST="blin@cs.wisc.edu,matyas+cron@cs.wisc.edu"
+
+#TIMEOUT=1200
+TIMEOUT=180
+
+die () {
+    echo "$@" 1>&2
+    exit 1
+}
+
+usage () {
+    echo "usage: $(basename $0) <EXPORT DIRECTORY> [IMAGE NAMES]"
+}
+
+function generate_image()
+{
+    echo -n "Creating image ${IMAGE_NAME}..."
+    /usr/bin/oz-install -t ${TIMEOUT} -d 4 -p -u -a "${KS_FILE}" -x "/tmp/${IMAGE_NAME}-oz-generated-libvirt.xml" "${FILE}" > "${OZ_LOG_FILE}" 2>&1
+    RC=$?
+    
+    if [ $RC -eq 0 ]; then
+        echo " success."
+        echo "Check log file for output of oz-install: ${OZ_LOG_FILE}"
+        
+        # Compress image.
+        echo -n "Compressing ${IMAGE_NAME} image..."
+        gzip -c --fast $LIBVIRT_IMAGE_DIRECTORY/$IMAGE_NAME.dsk > $LIBVIRT_IMAGE_DIRECTORY/$IMAGE_NAME.dsk.gz
+        echo " done."
+
+        # Copy new image to export directories and set permissions.
+        for DIR in ${EXPORT_DIRECTORIES[@]}; do
+            echo -n "Copying ${IMAGE_NAME} image to ${DIR} ..."
+            cp $LIBVIRT_IMAGE_DIRECTORY/$IMAGE_NAME.dsk $DIR
+            chmod 0664 $LIBVIRT_IMAGE_DIRECTORY/$IMAGE_NAME.dsk
+            cp $LIBVIRT_IMAGE_DIRECTORY/$IMAGE_NAME.dsk.gz $DIR
+            chmod 0664 $LIBVIRT_IMAGE_DIRECTORY/$IMAGE_NAME.dsk.gz
+            echo " done."
+        done
+
+    else
+        echo " fail."
+        echo "Check log file for output of oz-install: ${OZ_LOG_FILE}"
+
+        # Send email about failure.
+        echo -n "Emailing admins about failure..."
+        (
+            echo "oz-install failed to created ${IMAGE_NAME}."; 
+            echo "Please check the log files for more details.";
+            echo "oz-install log: $(hostname):${OZ_LOG_FILE}";
+            echo "";
+            echo "tail ${OZ_LOG_FILE}:";
+            tail $OZ_LOG_FILE;
+            echo "";
+        )|/bin/mail -s "${IMAGE_NAME} image creation failed" $ADMIN_EMAIL_LIST
+        echo " done."
+    fi
+}
+
+
+if [ $# -lt 1 ]; then
+    usage
+    die
+fi
+
+# Check to make sure we are running as root.
+if [ ! $(whoami) == "root" ]; then
+    echo "Please run this script as root."
+    exit 1
+fi
+
+
+# Check for oz-install command.
+if [ ! -f /usr/bin/oz-install ]; then
+    echo "ERROR! /usr/bin/oz-install does not exist! Exiting...."
+    exit 1
+fi
+
+
+# Create libvirt image directory if it does not exist.
+if [ ! -d $LIBVIRT_IMAGE_DIRECTORY ]; then
+    echo -n "Creating libvirt image directory: ${LIBVIRT_IMAGE_DIRECTORY} ..."
+    mkdir -p $LIBVIRT_IMAGE_DIRECTORY
+    echo " done."
+fi
+
+
+# Create backup image directory if it does not exist.
+if [ ! -d $BACKUP_IMAGE_DIRECTORY ]; then
+    echo -n "Creating backup image directory: ${BACKUP_IMAGE_DIRECTORY} ..."
+    mkdir -p $BACKUP_IMAGE_DIRECTORY
+    echo " done."
+fi
+
+
+# Create tdl directory if it does not exist.
+if [ ! -d $TDL_DIRECTORY ]; then
+    echo -n "Creating tdl directory: ${TDL_DIRECTORY} ..."
+    mkdir -p $TDL_DIRECTORY
+    echo " done."
+    echo "ATTENTION! Please place your tdl files in ${TDL_DIRECTORY}."
+    echo "Exiting..."
+    exit 1 
+fi
+
+
+# Check to make sure there are some tdl files in the tdl directory.
+if [ ! "$(ls -A $TDL_DIRECTORY)" ]; then
+    echo "ERROR! There are no tdl files in ${TDL_DIRECTORY}."
+    echo "Exiting..."
+    exit 1 
+fi
+
+
+# Check to make sure there is at least one export directory specified.
+if [ ${#EXPORT_DIRECTORIES[@]} -eq 0 ]; then
+    echo "ERROR! Please specify at least one export directory."
+    echo "Exiting..."
+    exit 1
+fi
+
+
+# Create export directories if they do not exist
+for DIR in ${EXPORT_DIRECTORIES[@]}; do
+    if [ ! -d $DIR ]; then
+        echo -n "Creating export directory: ${DIR} ..."
+        mkdir -p $DIR
+        echo " done."
+    fi
+done
+
+
+# Remove old log files.
+echo -n "Removing old log files..."
+rm -f $LOG_DIR/*.old
+echo " done."
+
+
+# Rotate existing log files.
+echo -n "Rotating existing log files..."
+for FILE in $LOG_DIR/*.log; do
+    mv $FILE $FILE.old > /dev/null 2>&1
+done
+echo " done."
+
+
+# Backup current images
+echo -n "Backing up current images to ${BACKUP_IMAGE_DIRECTORY}..."
+for DIR in ${EXPORT_DIRECTORIES[@]}; do
+    files=$(ls $DIR/*.dsk 2> /dev/null)
+    [[ -z $files ]] ||  rsync -av $files $BACKUP_IMAGE_DIRECTORY
+done
+echo " done."
+
+
+# Create new images and copy them to the export directories.
+for FILE in $TDL_DIRECTORY/*.tdl; do
+    IMAGE_NAME=$(grep -m 1 -i "<name>" $FILE |sed 's/\W*<.*>\(.*\)<\/.*>/\1/')
+    KS_FILE="${KS_DIRECTORY}/${IMAGE_NAME}.ks"
+    OZ_LOG_FILE="${LOG_DIR}/${IMAGE_NAME}.log"
+
+    # Check for command line argument.
+    if [ $# -gt 1 ]; then
+        if [[ ${IMAGE_NAME} == *${2}* ]]; then
+            generate_image
+        fi
+    else 
+        generate_image
+    fi
+done
+
+
+# Exit.
+echo "Exiting..."
+exit 0
