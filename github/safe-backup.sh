@@ -35,7 +35,7 @@ safebakrepo () {
 
     [[ -d $repo ]] || initrepo
 
-    datelog "Fetching $remote"
+    datelog "Fetching $repo"
     cd "$repo"
     timeout --kill-after=20s 240s git fetch
     safetags
