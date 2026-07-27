@@ -56,7 +56,7 @@ initrepo () {
 
     # allow non-ff pull request updates and select wip branches, and
     # ff-only updates for all other refs
-    wip_branches=("itb*" "preview-*" "wip/*" "copilot/*")
+    wip_branches=("itb*" "preview-*" "wip/*" "copilot/*" "dependabot/*")
     git config remote.origin.fetch '+refs/pull/*:refs/pull/*'
     for b in "${wip_branches[@]}"; do
       git config --add remote.origin.fetch "+refs/heads/$b:refs/heads/$b"
